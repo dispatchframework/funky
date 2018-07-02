@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"net/http"
-	"runtime"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Router interface {
@@ -30,55 +26,54 @@ func NewRouter(servers []Server) *RouterImpl {
 }
 
 func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
-	p, err := json.Marshal(input)
-	if err != nil {
-		// doSomething
-	}
-	server, err := r.findFreeServer()
+	server, _ := r.findFreeServer()
 	defer r.releaseServer(server)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 
-	stdoutInterrupt := make(chan bool)
 	stdoutPipe := server.StdoutPipe()
-	go copy(&stdoutBuf, stdoutPipe, stdoutInterrupt)
+	stdoutCh := copy(stdoutPipe)
+	stdoutInterrupt := make(chan []byte)
+	write(&stdoutBuf, stdoutCh, stdoutInterrupt)
 
-	//stderrInterrupt := make(chan bool)
-	//stderrPipe := server.StderrPipe()
-	//go copy(&stderrBuf, stderrPipe, stderrInterrupt)
+	stderrPipe := server.StderrPipe()
+	stderrCh := copy(stderrPipe)
+	stderrInterrupt := make(chan []byte)
+	write(&stderrBuf, stderrCh, stderrInterrupt)
 
-	ctx := input["context"].(map[string]interface{})
-	timeout := 0.0
-	if ctx["timeout"] != nil {
-		timeout = ctx["timeout"].(float64)
+	var e Error
+	resp, err := server.Invoke(input)
+	if resp != nil {
+		defer resp.Close()
 	}
-
-	var client http.Client
-	if timeout != 0 {
-		client = http.Client{
-			Timeout: time.Duration(timeout) * time.Millisecond,
-		}
-	} else {
-		client = http.Client{}
-	}
-
-	resp, err := client.Post(fmt.Sprintf("http://0.0.0.0:%d", server.GetPort()), "application/json", bytes.NewBuffer(p))
-
-	var errors Error
-
 	if err != nil {
-		if strings.Contains(err.Error(), "Client.Timeout") {
-			errors = Error{
-				ErrorType: "FUNCTION_EXCEPTION",
-				Message:   "Function exceeded timeout",
+		if _, ok := err.(TimeoutError); ok {
+			e = Error{
+				ErrorType: FUNCTION_ERROR,
+				Message:   "Invocation exceeded the timeout",
+			}
+		} else if _, ok := err.(BadRequestError); ok {
+			e = Error{
+				ErrorType: INPUT_ERROR,
+				Message:   "Input invalid",
+			}
+		} else if _, ok := err.(InvocationError); ok {
+			e = Error{
+				ErrorType: FUNCTION_ERROR,
+				Message:   "Failed invoking function.",
+			}
+		} else {
+			e = Error{
+				ErrorType: SYSTEM_ERROR,
+				Message:   "Something went wrong.",
 			}
 		}
-	} else {
-		defer resp.Body.Close()
 	}
 
-	stdoutInterrupt <- true
-	//stderrInterrupt <- true
+	close(stdoutInterrupt)
+	close(stderrInterrupt)
+	close(stdoutCh)
+	close(stderrCh)
 	logs := Logs{
 		Stdout: splitLogsOnNewline(&stdoutBuf),
 		Stderr: splitLogsOnNewline(&stderrBuf),
@@ -86,12 +81,12 @@ func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
 
 	context := Context{
 		Logs:  logs,
-		Error: errors,
+		Error: e,
 	}
 
 	respBuf := new(bytes.Buffer)
-	if err == nil {
-		respBuf.ReadFrom(resp.Body)
+	if resp != nil {
+		respBuf.ReadFrom(resp)
 	}
 	respPayload := make(map[string]interface{})
 	json.Unmarshal(respBuf.Bytes(), &respPayload)
@@ -135,23 +130,40 @@ func splitLogsOnNewline(stdBuffer *bytes.Buffer) []string {
 	return strings.Split(stdBuffer.String(), "\n")
 }
 
-func copy(dst io.Writer, src io.Reader, interrupt chan bool) {
+func copy(src io.Reader) chan []byte {
 	var p = make([]byte, 512)
+	var ch = make(chan []byte)
+	var num int
+	var err error
 
-	for {
-		select {
-		case <-interrupt:
-			return
-		default:
-			num, err := src.Read(p)
+	go func() {
+		for {
+			select {
+			case <-ch:
+				return
+			case ch <- p[:num]:
+				num, err = src.Read(p)
 
-			if num == 0 && err != nil {
+				if num == 0 && err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	return ch
+}
+
+func write(dst io.Writer, ch chan []byte, interrupt chan []byte) {
+
+	go func() {
+		for {
+			select {
+			case p := <-ch:
+				dst.Write(p)
+			case <-interrupt:
 				return
 			}
-
-			dst.Write(p[:num])
-			runtime.Gosched()
 		}
-		runtime.Gosched()
-	}
+	}()
 }

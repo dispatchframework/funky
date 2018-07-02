@@ -17,6 +17,12 @@ import (
 const serversEnvVar = "SERVERS"
 const serverCmdEnvVar = "SERVER_CMD"
 
+const (
+	INPUT_ERROR    = "InputError"
+	FUNCTION_ERROR = "FunctionError"
+	SYSTEM_ERROR   = "SystemError"
+)
+
 var servers []Server
 var router Router
 
@@ -32,13 +38,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		resp := Response{
 			Context: Context{
 				Error: Error{
-					ErrorType: "INPUT_ERROR",
+					ErrorType: INPUT_ERROR,
 					Message:   "Invalid Input",
 				},
 			},
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Fprintf(w, string(out))
+		return
 	}
 
 	resp, _ := router.Delegate(body)
@@ -63,7 +70,7 @@ func main() {
 	go func() {
 		<-c
 		for _, server := range servers {
-			server.GetCmd().Process.Kill()
+			server.Shutdown()
 		}
 		os.Exit(0)
 	}()
@@ -78,6 +85,7 @@ func createServers(numServers int, serverCmd string) ([]Server, error) {
 		cmd := exec.Command(cmds[0], cmds[1:]...)
 		server, _ := NewServer(9000+i, cmd)
 		if err := server.Start(); err != nil {
+			println(err)
 			return nil, errors.New("blah")
 		}
 		servers = append(servers, server)
