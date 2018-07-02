@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"sync"
 )
@@ -28,18 +27,6 @@ func NewRouter(servers []Server) *RouterImpl {
 func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
 	server, _ := r.findFreeServer()
 	defer r.releaseServer(server)
-
-	var stdoutBuf, stderrBuf bytes.Buffer
-
-	stdoutPipe := server.StdoutPipe()
-	stdoutCh := copy(stdoutPipe)
-	stdoutInterrupt := make(chan []byte)
-	write(&stdoutBuf, stdoutCh, stdoutInterrupt)
-
-	stderrPipe := server.StderrPipe()
-	stderrCh := copy(stderrPipe)
-	stderrInterrupt := make(chan []byte)
-	write(&stderrBuf, stderrCh, stderrInterrupt)
 
 	var e Error
 	resp, err := server.Invoke(input)
@@ -70,13 +57,9 @@ func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
 		}
 	}
 
-	close(stdoutInterrupt)
-	close(stderrInterrupt)
-	close(stdoutCh)
-	close(stderrCh)
 	logs := Logs{
-		Stdout: splitLogsOnNewline(&stdoutBuf),
-		Stderr: splitLogsOnNewline(&stderrBuf),
+		Stdout: splitLogsOnNewline(server.Stdout()),
+		Stderr: splitLogsOnNewline(server.Stderr()),
 	}
 
 	context := Context{
@@ -127,43 +110,8 @@ func (r *RouterImpl) releaseServer(server Server) {
 }
 
 func splitLogsOnNewline(stdBuffer *bytes.Buffer) []string {
-	return strings.Split(stdBuffer.String(), "\n")
-}
-
-func copy(src io.Reader) chan []byte {
-	var p = make([]byte, 512)
-	var ch = make(chan []byte)
-	var num int
-	var err error
-
-	go func() {
-		for {
-			select {
-			case <-ch:
-				return
-			case ch <- p[:num]:
-				num, err = src.Read(p)
-
-				if num == 0 && err != nil {
-					return
-				}
-			}
-		}
-	}()
-
-	return ch
-}
-
-func write(dst io.Writer, ch chan []byte, interrupt chan []byte) {
-
-	go func() {
-		for {
-			select {
-			case p := <-ch:
-				dst.Write(p)
-			case <-interrupt:
-				return
-			}
-		}
-	}()
+	b, _ := stdBuffer.ReadBytes(0)
+	b = bytes.TrimRight(b, "\x0000")
+	stdBuffer.UnreadByte()
+	return strings.Split(string(b), "\n")
 }

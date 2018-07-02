@@ -18,6 +18,8 @@ type Server interface {
 	SetIdle(bool)
 	GetPort() uint16
 	Invoke(input map[string]interface{}) (io.ReadCloser, error)
+	Stdout() *bytes.Buffer
+	Stderr() *bytes.Buffer
 	StderrPipe() io.ReadCloser
 	StdoutPipe() io.ReadCloser
 	Start() error
@@ -29,6 +31,8 @@ type ServerImpl struct {
 	port       uint16
 	cmd        *exec.Cmd
 	client     *http.Client
+	stdout     *bytes.Buffer
+	stderr     *bytes.Buffer
 	stdoutPipe io.ReadCloser
 	stderrPipe io.ReadCloser
 }
@@ -79,6 +83,14 @@ func (s *ServerImpl) Invoke(input map[string]interface{}) (io.ReadCloser, error)
 	return resp.Body, nil
 }
 
+func (s *ServerImpl) Stdout() *bytes.Buffer {
+	return s.stdout
+}
+
+func (s *ServerImpl) Stderr() *bytes.Buffer {
+	return s.stderr
+}
+
 func (s *ServerImpl) StderrPipe() io.ReadCloser {
 	return s.stderrPipe
 }
@@ -107,22 +119,29 @@ func NewServer(port uint16, cmd *exec.Cmd) (*ServerImpl, error) {
 
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
 
+	stdoutBuf, stderrBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
+
 	// TODO: proper error handling
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
+	//stdoutPipe, err := cmd.StdoutPipe()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//stderrPipe, err := cmd.StderrPipe()
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	return &ServerImpl{
-		isIdle:     true,
-		port:       port,
-		cmd:        cmd,
-		client:     &http.Client{},
-		stdoutPipe: stdoutPipe,
-		stderrPipe: stderrPipe,
+		isIdle: true,
+		port:   port,
+		cmd:    cmd,
+		client: &http.Client{},
+		stdout: stdoutBuf,
+		stderr: stderrBuf,
+		//stdoutPipe: stdoutPipe,
+		//stderrPipe: stderrPipe,
 	}, nil
 }
