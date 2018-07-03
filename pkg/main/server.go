@@ -35,6 +35,29 @@ type DefaultServer struct {
 	stderr *bytes.Buffer
 }
 
+// NewServer returns a new DefaultServer with the given port and command
+func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
+	if port < 1024 {
+		return nil, IllegalArgumentError("port")
+	}
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
+
+	stdoutBuf, stderrBuf := &bytes.Buffer{}, &bytes.Buffer{}
+
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
+
+	return &DefaultServer{
+		isIdle: true,
+		port:   port,
+		cmd:    cmd,
+		client: &http.Client{},
+		stdout: stdoutBuf,
+		stderr: stderrBuf,
+	}, nil
+}
+
 // IsIdle indicates whether this server is currently idle or processing a request
 func (s *DefaultServer) IsIdle() bool {
 	return s.isIdle
@@ -76,13 +99,14 @@ func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, err
 		}
 	}
 
-	if resp.StatusCode == 400 {
+	switch resp.StatusCode {
+	case 400:
 		return nil, BadRequestError("invalid input")
-	} else if resp.StatusCode == 500 {
+	case 500:
 		return nil, InvocationError(resp.StatusCode)
-	} else if resp.StatusCode == 422 {
+	case 422:
 		return nil, InvalidResponsePayloadError("")
-	} else if resp.StatusCode == 502 {
+	case 502:
 		return nil, UnknownSystemError("")
 	}
 
@@ -112,27 +136,4 @@ func (s *DefaultServer) Shutdown() error {
 	}
 
 	return err
-}
-
-// NewServer returns a new DefaultServer with the given port and command
-func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
-	if port < 1024 {
-		return nil, IllegalArgumentError("port")
-	}
-
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
-
-	stdoutBuf, stderrBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
-
-	cmd.Stdout = stdoutBuf
-	cmd.Stderr = stderrBuf
-
-	return &DefaultServer{
-		isIdle: true,
-		port:   port,
-		cmd:    cmd,
-		client: &http.Client{},
-		stdout: stdoutBuf,
-		stderr: stderrBuf,
-	}, nil
 }

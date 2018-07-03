@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 	"sync"
 )
@@ -11,6 +13,7 @@ import (
 // Router an interface for delegating function invocations to idle servers
 type Router interface {
 	Delegate(input map[string]interface{}) (*Response, error)
+	Shutdown() error
 }
 
 // DefaultRouter a struct that hold servers that can be delegated to
@@ -20,7 +23,9 @@ type DefaultRouter struct {
 }
 
 // NewRouter constructor for DefaultRouters
-func NewRouter(servers []Server) *DefaultRouter {
+func NewRouter(numServers int, serverCmd string) *DefaultRouter {
+	servers, _ := createServers(numServers, serverCmd)
+
 	return &DefaultRouter{
 		servers: servers,
 		mutex:   &sync.Mutex{},
@@ -29,7 +34,11 @@ func NewRouter(servers []Server) *DefaultRouter {
 
 // Delegate delegates function invocation to an idle server
 func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error) {
-	server, _ := r.findFreeServer()
+	server, err := r.findFreeServer()
+	if err != nil {
+		return nil, err
+	}
+
 	defer r.releaseServer(server)
 
 	var e Error
@@ -38,36 +47,43 @@ func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error
 		defer resp.Close()
 	}
 	if err != nil {
-		if _, ok := err.(TimeoutError); ok {
+		switch err.(type) {
+		case TimeoutError:
 			e = Error{
 				ErrorType: FunctionError,
-				Message:   "Invocation exceeded the timeout",
+				Message:   err.Error(),
 			}
-		} else if _, ok := err.(BadRequestError); ok {
+			break
+		case BadRequestError:
 			e = Error{
 				ErrorType: InputError,
-				Message:   "Input invalid",
+				Message:   err.Error(),
 			}
-		} else if _, ok := err.(InvocationError); ok {
+			break
+		case InvocationError:
 			e = Error{
 				ErrorType: FunctionError,
-				Message:   "Failed invoking function.",
+				Message:   err.Error(),
 			}
-		} else if _, ok := err.(InvalidResponsePayloadError); ok {
+			break
+		case InvalidResponsePayloadError:
 			e = Error{
 				ErrorType: InputError,
-				Message:   "Failed serialzing function return return",
+				Message:   err.Error(),
 			}
-		} else if _, ok := err.(UnknownSystemError); ok {
+			break
+		case UnknownSystemError:
 			e = Error{
 				ErrorType: SystemError,
-				Message:   "An unknown error occured",
+				Message:   err.Error(),
 			}
-		} else {
+			break
+		default:
 			e = Error{
 				ErrorType: SystemError,
-				Message:   "Something went wrong.",
+				Message:   err.Error(),
 			}
+			break
 		}
 	}
 
@@ -96,9 +112,41 @@ func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error
 	return response, nil
 }
 
+// Shutdown shuts down the servers managed by this router
+func (r *DefaultRouter) Shutdown() error {
+	var err error
+	for _, server := range r.servers {
+		err = server.Shutdown()
+	}
+
+	if err != nil {
+		return errors.New("Failed to shutdown one or more servers")
+	}
+
+	return nil
+}
+
+func createServers(numServers int, serverCmd string) ([]Server, error) {
+	servers := []Server{}
+	for i := uint16(0); i < uint16(numServers); i++ {
+		cmds := strings.SplitN(serverCmd, " ", 3)
+		cmd := exec.Command(cmds[0], cmds[1:]...)
+		server, err := NewServer(9000+i, cmd)
+		if err != nil {
+			return nil, fmt.Errorf("Failed creating server on port %d", 9000+i)
+		}
+		if err := server.Start(); err != nil {
+			return nil, fmt.Errorf("Failed to start server %+v", err)
+		}
+		servers = append(servers, server)
+	}
+
+	return servers, nil
+}
+
 func (r *DefaultRouter) findFreeServer() (Server, error) {
 	var ret Server
-	for _, server := range servers {
+	for _, server := range r.servers {
 		r.mutex.Lock()
 		if server.IsIdle() {
 			server.SetIdle(false)
