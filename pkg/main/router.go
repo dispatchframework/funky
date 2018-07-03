@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 	"sync"
+
+	"golang.org/x/sync/semaphore"
 )
 
 // Router an interface for delegating function invocations to idle servers
@@ -20,6 +23,7 @@ type Router interface {
 type DefaultRouter struct {
 	servers []Server
 	mutex   *sync.Mutex
+	sem     *semaphore.Weighted
 }
 
 // NewRouter constructor for DefaultRouters
@@ -29,6 +33,7 @@ func NewRouter(numServers int, serverCmd string) *DefaultRouter {
 	return &DefaultRouter{
 		servers: servers,
 		mutex:   &sync.Mutex{},
+		sem:     semaphore.NewWeighted(int64(numServers)),
 	}
 }
 
@@ -146,6 +151,8 @@ func createServers(numServers int, serverCmd string) ([]Server, error) {
 
 func (r *DefaultRouter) findFreeServer() (Server, error) {
 	var ret Server
+
+	r.sem.Acquire(context.TODO(), 1)
 	for _, server := range r.servers {
 		r.mutex.Lock()
 		if server.IsIdle() {
@@ -159,6 +166,7 @@ func (r *DefaultRouter) findFreeServer() (Server, error) {
 	}
 
 	if ret == nil {
+		r.sem.Release(1)
 		return nil, errors.New("no free server")
 	}
 
@@ -169,6 +177,7 @@ func (r *DefaultRouter) releaseServer(server Server) {
 	r.mutex.Lock()
 	server.SetIdle(true)
 	r.mutex.Unlock()
+	r.sem.Release(1)
 }
 
 func splitLogsOnNewline(stdBuffer *bytes.Buffer) []string {
