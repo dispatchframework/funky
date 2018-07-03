@@ -81,9 +81,9 @@ func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, err
 	} else if resp.StatusCode == 500 {
 		return nil, InvocationError(resp.StatusCode)
 	} else if resp.StatusCode == 422 {
-		return nil, nil
+		return nil, InvalidResponsePayloadError("")
 	} else if resp.StatusCode == 502 {
-
+		return nil, UnknownSystemError("")
 	}
 
 	return resp.Body, nil

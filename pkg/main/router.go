@@ -40,22 +40,32 @@ func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error
 	if err != nil {
 		if _, ok := err.(TimeoutError); ok {
 			e = Error{
-				ErrorType: FUNCTION_ERROR,
+				ErrorType: FunctionError,
 				Message:   "Invocation exceeded the timeout",
 			}
 		} else if _, ok := err.(BadRequestError); ok {
 			e = Error{
-				ErrorType: INPUT_ERROR,
+				ErrorType: InputError,
 				Message:   "Input invalid",
 			}
 		} else if _, ok := err.(InvocationError); ok {
 			e = Error{
-				ErrorType: FUNCTION_ERROR,
+				ErrorType: FunctionError,
 				Message:   "Failed invoking function.",
+			}
+		} else if _, ok := err.(InvalidResponsePayloadError); ok {
+			e = Error{
+				ErrorType: InputError,
+				Message:   "Failed serialzing function return return",
+			}
+		} else if _, ok := err.(UnknownSystemError); ok {
+			e = Error{
+				ErrorType: SystemError,
+				Message:   "An unknown error occured",
 			}
 		} else {
 			e = Error{
-				ErrorType: SYSTEM_ERROR,
+				ErrorType: SystemError,
 				Message:   "Something went wrong.",
 			}
 		}

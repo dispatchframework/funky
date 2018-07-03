@@ -19,9 +19,9 @@ const serverCmdEnvVar = "SERVER_CMD"
 
 // Constants indicating the types of errors for Dispatch function invocation
 const (
-	INPUT_ERROR    = "InputError"
-	FUNCTION_ERROR = "FunctionError"
-	SYSTEM_ERROR   = "SystemError"
+	InputError    = "InputError"
+	FunctionError = "FunctionError"
+	SystemError   = "SystemError"
 )
 
 var servers []Server
@@ -39,7 +39,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		resp := Response{
 			Context: Context{
 				Error: Error{
-					ErrorType: INPUT_ERROR,
+					ErrorType: InputError,
 					Message:   "Invalid Input",
 				},
 			},

@@ -31,3 +31,17 @@ type InvocationError string
 func (e InvocationError) Error() string {
 	return fmt.Sprintf("Invocation of the function failed: %s", e)
 }
+
+// InvalidResponsePayloadError error indicating that function return could not be serialized
+type InvalidResponsePayloadError string
+
+func (e InvalidResponsePayloadError) Error() string {
+	return fmt.Sprintf("Unable to serialize response payload: %s", e)
+}
+
+// UnknownSystemError error for when something unknown happens during function invocation
+type UnknownSystemError string
+
+func (e UnknownSystemError) Error() string {
+	return fmt.Sprintf("Unknown system error: %s", e)
+}
