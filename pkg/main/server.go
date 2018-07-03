@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Server an interface for managing function servers
 type Server interface {
 	IsIdle() bool
 	SetIdle(bool)
@@ -20,36 +21,37 @@ type Server interface {
 	Invoke(input map[string]interface{}) (io.ReadCloser, error)
 	Stdout() *bytes.Buffer
 	Stderr() *bytes.Buffer
-	StderrPipe() io.ReadCloser
-	StdoutPipe() io.ReadCloser
 	Start() error
 	Shutdown() error
 }
 
-type ServerImpl struct {
-	isIdle     bool
-	port       uint16
-	cmd        *exec.Cmd
-	client     *http.Client
-	stdout     *bytes.Buffer
-	stderr     *bytes.Buffer
-	stdoutPipe io.ReadCloser
-	stderrPipe io.ReadCloser
+// DefaultServer a struct to hold information about running servers
+type DefaultServer struct {
+	isIdle bool
+	port   uint16
+	cmd    *exec.Cmd
+	client *http.Client
+	stdout *bytes.Buffer
+	stderr *bytes.Buffer
 }
 
-func (s *ServerImpl) IsIdle() bool {
+// IsIdle indicates whether this server is currently idle or processing a request
+func (s *DefaultServer) IsIdle() bool {
 	return s.isIdle
 }
 
-func (s *ServerImpl) SetIdle(idle bool) {
+// SetIdle sets whether this server is currently idle or processing a request
+func (s *DefaultServer) SetIdle(idle bool) {
 	s.isIdle = idle
 }
 
-func (s *ServerImpl) GetPort() uint16 {
+// GetPort returns the port this server is running on
+func (s *DefaultServer) GetPort() uint16 {
 	return s.port
 }
 
-func (s *ServerImpl) Invoke(input map[string]interface{}) (io.ReadCloser, error) {
+// Invoke calls the server with the given input to invoke a Dispatch function
+func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, error) {
 	p, err := json.Marshal(input)
 
 	ctx, ok := input["context"].(map[string]interface{})
@@ -78,32 +80,32 @@ func (s *ServerImpl) Invoke(input map[string]interface{}) (io.ReadCloser, error)
 		return nil, BadRequestError("invalid input")
 	} else if resp.StatusCode == 500 {
 		return nil, InvocationError(resp.StatusCode)
+	} else if resp.StatusCode == 422 {
+		return nil, nil
+	} else if resp.StatusCode == 502 {
+
 	}
 
 	return resp.Body, nil
 }
 
-func (s *ServerImpl) Stdout() *bytes.Buffer {
+// Stdout returns the Buffer containing stdout
+func (s *DefaultServer) Stdout() *bytes.Buffer {
 	return s.stdout
 }
 
-func (s *ServerImpl) Stderr() *bytes.Buffer {
+// Stderr returns the Buffer containing stderr
+func (s *DefaultServer) Stderr() *bytes.Buffer {
 	return s.stderr
 }
 
-func (s *ServerImpl) StderrPipe() io.ReadCloser {
-	return s.stderrPipe
-}
-
-func (s *ServerImpl) StdoutPipe() io.ReadCloser {
-	return s.stdoutPipe
-}
-
-func (s *ServerImpl) Start() error {
+// Start starts the server
+func (s *DefaultServer) Start() error {
 	return s.cmd.Start()
 }
 
-func (s *ServerImpl) Shutdown() error {
+// Shutdown shuts down the server, kills it if necessary
+func (s *DefaultServer) Shutdown() error {
 	err := s.cmd.Wait()
 	if err != nil {
 		return s.cmd.Process.Kill()
@@ -112,7 +114,8 @@ func (s *ServerImpl) Shutdown() error {
 	return err
 }
 
-func NewServer(port uint16, cmd *exec.Cmd) (*ServerImpl, error) {
+// NewServer returns a new DefaultServer with the given port and command
+func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
 	if port < 1024 {
 		return nil, IllegalArgumentError("port")
 	}
@@ -124,24 +127,12 @@ func NewServer(port uint16, cmd *exec.Cmd) (*ServerImpl, error) {
 	cmd.Stdout = stdoutBuf
 	cmd.Stderr = stderrBuf
 
-	// TODO: proper error handling
-	//stdoutPipe, err := cmd.StdoutPipe()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stderrPipe, err := cmd.StderrPipe()
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	return &ServerImpl{
+	return &DefaultServer{
 		isIdle: true,
 		port:   port,
 		cmd:    cmd,
 		client: &http.Client{},
 		stdout: stdoutBuf,
 		stderr: stderrBuf,
-		//stdoutPipe: stdoutPipe,
-		//stderrPipe: stderrPipe,
 	}, nil
 }

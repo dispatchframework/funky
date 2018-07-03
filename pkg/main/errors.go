@@ -4,24 +4,28 @@ import (
 	"fmt"
 )
 
+// IllegalArgumentError  An error indicating that an argument to a method is illegal or invalid.
 type IllegalArgumentError string
 
 func (e IllegalArgumentError) Error() string {
 	return fmt.Sprintf("The argument is illegal or inappropriate: %s", e)
 }
 
+// TimeoutError An error indicating that a timeout has been exceeded
 type TimeoutError string
 
 func (e TimeoutError) Error() string {
 	return fmt.Sprintf("The invocation exceeded the timeout: %s", e)
 }
 
+// BadRequestError An error indicating that the body of an http request was invalid
 type BadRequestError string
 
 func (e BadRequestError) Error() string {
 	return fmt.Sprintf("The request body is invalid: %+v", e)
 }
 
+// InvocationError An error indicating that a general error occurred while invoking a function
 type InvocationError string
 
 func (e InvocationError) Error() string {

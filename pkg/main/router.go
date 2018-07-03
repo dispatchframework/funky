@@ -8,23 +8,27 @@ import (
 	"sync"
 )
 
+// Router an interface for delegating function invocations to idle servers
 type Router interface {
 	Delegate(input map[string]interface{}) (*Response, error)
 }
 
-type RouterImpl struct {
+// DefaultRouter a struct that hold servers that can be delegated to
+type DefaultRouter struct {
 	servers []Server
 	mutex   *sync.Mutex
 }
 
-func NewRouter(servers []Server) *RouterImpl {
-	return &RouterImpl{
+// NewRouter constructor for DefaultRouters
+func NewRouter(servers []Server) *DefaultRouter {
+	return &DefaultRouter{
 		servers: servers,
 		mutex:   &sync.Mutex{},
 	}
 }
 
-func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
+// Delegate delegates function invocation to an idle server
+func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error) {
 	server, _ := r.findFreeServer()
 	defer r.releaseServer(server)
 
@@ -82,7 +86,7 @@ func (r *RouterImpl) Delegate(input map[string]interface{}) (*Response, error) {
 	return response, nil
 }
 
-func (r *RouterImpl) findFreeServer() (Server, error) {
+func (r *DefaultRouter) findFreeServer() (Server, error) {
 	var ret Server
 	for _, server := range servers {
 		r.mutex.Lock()
@@ -103,7 +107,7 @@ func (r *RouterImpl) findFreeServer() (Server, error) {
 	return ret, nil
 }
 
-func (r *RouterImpl) releaseServer(server Server) {
+func (r *DefaultRouter) releaseServer(server Server) {
 	r.mutex.Lock()
 	server.SetIdle(true)
 	r.mutex.Unlock()
