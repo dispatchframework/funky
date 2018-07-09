@@ -1,4 +1,4 @@
-package main
+package funky
 
 import (
 	"bytes"
@@ -56,6 +56,26 @@ func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
 		stdout: stdoutBuf,
 		stderr: stderrBuf,
 	}, nil
+}
+
+type ServerFactory interface {
+	CreateServer(port uint16) (Server, error)
+}
+
+type DefaultServerFactory struct {
+	serverCmd string
+}
+
+func NewDefaultServerFactory(serverCmd string) ServerFactory {
+	return &DefaultServerFactory{
+		serverCmd: serverCmd,
+	}
+}
+
+func (f *DefaultServerFactory) CreateServer(port uint16) (Server, error) {
+	cmds := strings.Split(f.serverCmd, " ")
+	cmd := exec.Command(cmds[0], cmds[1:]...)
+	return NewServer(port, cmd)
 }
 
 // IsIdle indicates whether this server is currently idle or processing a request

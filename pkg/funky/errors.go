@@ -1,4 +1,4 @@
-package main
+package funky
 
 import (
 	"fmt"

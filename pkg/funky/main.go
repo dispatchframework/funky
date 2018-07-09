@@ -1,4 +1,4 @@
-package main
+package funky
 
 import (
 	"bytes"
@@ -92,7 +92,8 @@ func main() {
 	}
 
 	serverCmd := os.Getenv(serverCmdEnvVar)
-	router := NewRouter(numServers, serverCmd)
+	serverFactory := NewDefaultServerFactory(serverCmd)
+	router := NewRouter(numServers, serverFactory)
 	handler := FunkyHandler{
 		router: router,
 	}

@@ -1,4 +1,4 @@
-package main
+package funky
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"sync"
 
@@ -27,8 +26,8 @@ type DefaultRouter struct {
 }
 
 // NewRouter constructor for DefaultRouters
-func NewRouter(numServers int, serverCmd string) *DefaultRouter {
-	servers, _ := createServers(numServers, serverCmd)
+func NewRouter(numServers int, serverFactory ServerFactory) *DefaultRouter {
+	servers, _ := createServers(numServers, serverFactory)
 
 	return &DefaultRouter{
 		servers: servers,
@@ -131,12 +130,10 @@ func (r *DefaultRouter) Shutdown() error {
 	return nil
 }
 
-func createServers(numServers int, serverCmd string) ([]Server, error) {
+func createServers(numServers int, serverFactory ServerFactory) ([]Server, error) {
 	servers := []Server{}
 	for i := uint16(0); i < uint16(numServers); i++ {
-		cmds := strings.SplitN(serverCmd, " ", 3)
-		cmd := exec.Command(cmds[0], cmds[1:]...)
-		server, err := NewServer(9000+i, cmd)
+		server, err := serverFactory.CreateServer(9000 + i)
 		if err != nil {
 			return nil, fmt.Errorf("Failed creating server on port %d", 9000+i)
 		}

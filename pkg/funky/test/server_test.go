@@ -1,4 +1,4 @@
-package main
+package funky
 
 import (
 	"os/exec"
@@ -23,4 +23,14 @@ func TestNewServerInvalidPort(t *testing.T) {
 	if _, ok := err.(IllegalArgumentError); !ok {
 		t.Errorf("Should have errored when provided a port less than 1024. Port value: %v", port)
 	}
+}
+
+func TestInvokeSuccess(t *testing.T) {
+	var port uint16 = 9090
+	server, err := NewServer(port, exec.Command("echo"))
+	if err != nil {
+		t.Errorf("Failed to create new server: %+v", err)
+	}
+
+	server.Invoke(map[string]interface{}{})
 }
