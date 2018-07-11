@@ -2,7 +2,7 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
-package funky
+package main
 
 import (
 	"bytes"
@@ -75,7 +75,7 @@ type DefaultServerFactory struct {
 
 // NewDefaultServerFactory a DefaultServerFactory constructor; validates the server command.
 func NewDefaultServerFactory(serverCmd string) (ServerFactory, error) {
-	cmds := strings.Split(serverCmd, " ")
+	cmds := strings.Fields(serverCmd)
 
 	if len(cmds) < 1 {
 		return nil, IllegalArgumentError(serverCmd)
@@ -83,9 +83,10 @@ func NewDefaultServerFactory(serverCmd string) (ServerFactory, error) {
 
 	var args []string
 	if len(cmds) < 2 {
-		args = cmds[1:]
-	} else {
 		args = []string{}
+	} else {
+		args = cmds[1:]
+
 	}
 
 	return &DefaultServerFactory{
@@ -130,7 +131,7 @@ func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, err
 
 	s.client.Timeout = time.Duration(timeout) * time.Millisecond
 
-	resp, err := s.client.Post(fmt.Sprintf("http://0.0.0.0:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
+	resp, err := s.client.Post(fmt.Sprintf("http://127.0.0.1:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
 
 	if err != nil {
 		if strings.Contains(err.Error(), "Client.Timeout") {

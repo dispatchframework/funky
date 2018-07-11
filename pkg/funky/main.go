@@ -2,7 +2,7 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
-package funky
+package main
 
 import (
 	"bytes"
@@ -102,6 +102,9 @@ func main() {
 	}
 
 	router, err := NewRouter(numServers, serverFactory)
+	if err != nil {
+		log.Fatal("Failed creating new router: %+v", err)
+	}
 	handler := funkyHandler{
 		router: router,
 	}
