@@ -103,7 +103,7 @@ func main() {
 
 	router, err := NewRouter(numServers, serverFactory)
 	if err != nil {
-		log.Fatal("Failed creating new router: %+v", err)
+		log.Fatalf("Failed creating new router: %+v", err)
 	}
 	handler := funkyHandler{
 		router: router,

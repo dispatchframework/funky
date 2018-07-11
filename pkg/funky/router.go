@@ -17,7 +17,7 @@ import (
 )
 
 // FirstPort the starting port number for servers created by a Router
-var FirstPort uint16 = 9000
+const FirstPort uint16 = 9000
 
 // Router an interface for delegating function invocations to idle servers
 type Router interface {

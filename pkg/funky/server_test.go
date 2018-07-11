@@ -2,7 +2,7 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
-package funky
+package main
 
 import (
 	"bytes"
@@ -15,13 +15,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/dispatchframework/funky/pkg/funky"
 )
 
 func TestNewServerSuccess(t *testing.T) {
 	var port uint16 = 9090
-	server, err := funky.NewServer(port, exec.Command("echo"))
+	server, err := NewServer(port, exec.Command("echo"))
 	if err != nil {
 		t.Fatalf("Failed to construct server with error %v", err.Error())
 	}
@@ -33,8 +31,8 @@ func TestNewServerSuccess(t *testing.T) {
 
 func TestNewServerInvalidPort(t *testing.T) {
 	var port uint16 = 80
-	_, err := funky.NewServer(port, exec.Command("echo"))
-	if _, ok := err.(funky.IllegalArgumentError); !ok {
+	_, err := NewServer(port, exec.Command("echo"))
+	if _, ok := err.(IllegalArgumentError); !ok {
 		t.Errorf("Should have errored when provided a port less than 1024. Port value: %v", port)
 	}
 }
@@ -54,7 +52,7 @@ func TestInvokeSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't convert port %s", urlParts[len(urlParts)-1])
 	}
-	server, err := funky.NewServer(uint16(port), exec.Command("echo"))
+	server, err := NewServer(uint16(port), exec.Command("echo"))
 	if err != nil {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
@@ -100,7 +98,7 @@ func TestInvokeBadRequest(t *testing.T) {
 		t.Fatalf("Could not convert port %s", urlParts[len(urlParts)-1])
 	}
 
-	server, err := funky.NewServer(uint16(port), exec.Command("echo"))
+	server, err := NewServer(uint16(port), exec.Command("echo"))
 	if err != nil {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
@@ -113,7 +111,7 @@ func TestInvokeBadRequest(t *testing.T) {
 		t.Fatalf("Expected BadRequest error, instead got no error")
 	}
 
-	if _, ok := err.(funky.BadRequestError); !ok {
+	if _, ok := err.(BadRequestError); !ok {
 		t.Errorf("Expected BadRequestError got %s", err)
 	}
 }
