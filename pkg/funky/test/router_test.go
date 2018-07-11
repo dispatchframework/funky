@@ -2,24 +2,26 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
-package main
+package test
 
 import (
 	"bytes"
 	"errors"
 	"testing"
 
+	"github.com/dispatchframework/funky/pkg/funky"
+	"github.com/dispatchframework/funky/pkg/funky/mocks"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestNewRouterSuccess(t *testing.T) {
-	server := new(ServerMock)
+	server := new(mocks.Server)
 	server.On("Start").Return(nil)
 
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(server, nil)
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
-	_, err := NewRouter(1, serverFactory)
+	_, err := funky.NewRouter(1, serverFactory)
 
 	if err != nil {
 		t.Errorf("Failed to construct DefaultRouter: %+v", err)
@@ -27,24 +29,24 @@ func TestNewRouterSuccess(t *testing.T) {
 }
 
 func TestNewRouterZeroServers(t *testing.T) {
-	serverFactory := new(ServerFactoryMock)
+	serverFactory := new(mocks.ServerFactory)
 
-	_, err := NewRouter(0, serverFactory)
+	_, err := funky.NewRouter(0, serverFactory)
 
 	if err == nil {
 		t.Fatal("NewRouter should fail with IllegalArgumentError when numServers is zero")
 	}
 
-	if _, ok := err.(IllegalArgumentError); !ok {
+	if _, ok := err.(funky.IllegalArgumentError); !ok {
 		t.Errorf("NewRouter failed with %s, but expecting IllegalArgumentError", err.Error())
 	}
 }
 
 func TestNewRouterFailCreatingServer(t *testing.T) {
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(nil, IllegalArgumentError("port"))
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(nil, funky.IllegalArgumentError("port"))
 
-	_, err := NewRouter(1, serverFactory)
+	_, err := funky.NewRouter(1, serverFactory)
 
 	if err == nil {
 		t.Errorf("Should have failed creating new router when server errored")
@@ -52,12 +54,12 @@ func TestNewRouterFailCreatingServer(t *testing.T) {
 }
 
 func TestNewRouterFailStartingServer(t *testing.T) {
-	server := new(ServerMock)
+	server := new(mocks.Server)
 	server.On("Start").Return(errors.New("Failed to start server"))
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(server, nil)
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
-	_, err := NewRouter(1, serverFactory)
+	_, err := funky.NewRouter(1, serverFactory)
 
 	server.AssertCalled(t, "Start")
 
@@ -67,7 +69,7 @@ func TestNewRouterFailStartingServer(t *testing.T) {
 }
 
 func TestDelegateSuccess(t *testing.T) {
-	server := new(ServerMock)
+	server := new(mocks.Server)
 	server.On("Start").Return(nil)
 	server.On("IsIdle").Return(true)
 	server.On("SetIdle", mock.AnythingOfType("bool")).Return().Return()
@@ -75,10 +77,10 @@ func TestDelegateSuccess(t *testing.T) {
 	server.On("Stdout").Return(&bytes.Buffer{})
 	server.On("Stderr").Return(&bytes.Buffer{})
 
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(server, nil)
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
-	router, _ := NewRouter(1, serverFactory)
+	router, _ := funky.NewRouter(1, serverFactory)
 
 	_, err := router.Delegate(map[string]interface{}{})
 
@@ -88,14 +90,14 @@ func TestDelegateSuccess(t *testing.T) {
 }
 
 func TestRouterShutdownSuccess(t *testing.T) {
-	server := new(ServerMock)
+	server := new(mocks.Server)
 	server.On("Start").Return(nil)
 	server.On("Shutdown").Return(nil)
 
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(server, nil)
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
-	router, _ := NewRouter(1, serverFactory)
+	router, _ := funky.NewRouter(1, serverFactory)
 	err := router.Shutdown()
 
 	if err != nil {
@@ -104,14 +106,14 @@ func TestRouterShutdownSuccess(t *testing.T) {
 }
 
 func TestRouterShutdownFailure(t *testing.T) {
-	server := new(ServerMock)
+	server := new(mocks.Server)
 	server.On("Start").Return(nil)
 	server.On("Shutdown").Return(errors.New("failed to shutdown server"))
 
-	serverFactory := new(ServerFactoryMock)
-	serverFactory.On("CreateServer", uint16(FirstPort)).Return(server, nil)
+	serverFactory := new(mocks.ServerFactory)
+	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
-	router, _ := NewRouter(1, serverFactory)
+	router, _ := funky.NewRouter(1, serverFactory)
 
 	err := router.Shutdown()
 
