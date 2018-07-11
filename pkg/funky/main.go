@@ -49,11 +49,11 @@ type Logs struct {
 	Stderr []string `json:"stderr"`
 }
 
-type FunkyHandler struct {
+type funkyHandler struct {
 	router Router
 }
 
-func (f FunkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reader := r.Body
 
 	buf := new(bytes.Buffer)
@@ -85,16 +85,20 @@ func (f FunkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func main() {
 	numServers, err := strconv.Atoi(os.Getenv(serversEnvVar))
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Unable to parse %s environment variable", serversEnvVar))
+		log.Fatalf("Unable to parse %s environment variable", serversEnvVar)
 	}
 	if numServers < 1 {
 		numServers = 1
 	}
 
 	serverCmd := os.Getenv(serverCmdEnvVar)
-	serverFactory := NewDefaultServerFactory(serverCmd)
-	router := NewRouter(numServers, serverFactory)
-	handler := FunkyHandler{
+	serverFactory, err := NewDefaultServerFactory(serverCmd)
+	if err != nil {
+		log.Fatal("Too few arguments to server command.")
+	}
+
+	router, err := NewRouter(numServers, serverFactory)
+	handler := funkyHandler{
 		router: router,
 	}
 	server := &http.Server{

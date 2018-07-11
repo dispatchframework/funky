@@ -58,23 +58,41 @@ func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
 	}, nil
 }
 
+// ServerFactory an interface for creating new Servers decoupled from the concrete implementation
 type ServerFactory interface {
 	CreateServer(port uint16) (Server, error)
 }
 
+// DefaultServerFactory concrete implementation of ServerFactory.
 type DefaultServerFactory struct {
-	serverCmd string
+	cmd  string
+	args []string
 }
 
-func NewDefaultServerFactory(serverCmd string) ServerFactory {
-	return &DefaultServerFactory{
-		serverCmd: serverCmd,
+// NewDefaultServerFactory a DefaultServerFactory constructor; validates the server command.
+func NewDefaultServerFactory(serverCmd string) (ServerFactory, error) {
+	cmds := strings.Split(serverCmd, " ")
+
+	if len(cmds) < 1 {
+		return nil, IllegalArgumentError(serverCmd)
 	}
+
+	var args []string
+	if len(cmds) < 2 {
+		args = cmds[1:]
+	} else {
+		args = []string{}
+	}
+
+	return &DefaultServerFactory{
+		cmd:  cmds[0],
+		args: args,
+	}, nil
 }
 
+// CreateServer creates a new server by initiating a Command with the given port and preconfigured server command
 func (f *DefaultServerFactory) CreateServer(port uint16) (Server, error) {
-	cmds := strings.Split(f.serverCmd, " ")
-	cmd := exec.Command(cmds[0], cmds[1:]...)
+	cmd := exec.Command(f.cmd, f.args...)
 	return NewServer(port, cmd)
 }
 
@@ -111,9 +129,8 @@ func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, err
 	resp, err := s.client.Post(fmt.Sprintf("http://0.0.0.0:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
 
 	if err != nil {
-		println(err.Error())
 		if strings.Contains(err.Error(), "Client.Timeout") {
-			return nil, TimeoutError(fmt.Sprintf("%d", timeout))
+			return nil, TimeoutError(fmt.Sprintf("%g", timeout))
 		} else if strings.Contains(err.Error(), "connection refused") {
 			return nil, errors.New("connection refused")
 		}

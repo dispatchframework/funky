@@ -12,6 +12,9 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+// FirstPort the starting port number for servers created by a Router
+var FirstPort uint16 = 9000
+
 // Router an interface for delegating function invocations to idle servers
 type Router interface {
 	Delegate(input map[string]interface{}) (*Response, error)
@@ -26,14 +29,21 @@ type DefaultRouter struct {
 }
 
 // NewRouter constructor for DefaultRouters
-func NewRouter(numServers int, serverFactory ServerFactory) *DefaultRouter {
-	servers, _ := createServers(numServers, serverFactory)
+func NewRouter(numServers int, serverFactory ServerFactory) (*DefaultRouter, error) {
+	if numServers < 1 {
+		return nil, IllegalArgumentError("numServers")
+	}
+
+	servers, err := createServers(numServers, serverFactory)
+	if err != nil {
+		return nil, err
+	}
 
 	return &DefaultRouter{
 		servers: servers,
 		mutex:   &sync.Mutex{},
 		sem:     semaphore.NewWeighted(int64(numServers)),
-	}
+	}, nil
 }
 
 // Delegate delegates function invocation to an idle server
@@ -133,9 +143,9 @@ func (r *DefaultRouter) Shutdown() error {
 func createServers(numServers int, serverFactory ServerFactory) ([]Server, error) {
 	servers := []Server{}
 	for i := uint16(0); i < uint16(numServers); i++ {
-		server, err := serverFactory.CreateServer(9000 + i)
+		server, err := serverFactory.CreateServer(FirstPort + i)
 		if err != nil {
-			return nil, fmt.Errorf("Failed creating server on port %d", 9000+i)
+			return nil, fmt.Errorf("Failed creating server on port %d", FirstPort+i)
 		}
 		if err := server.Start(); err != nil {
 			return nil, fmt.Errorf("Failed to start server %+v", err)
