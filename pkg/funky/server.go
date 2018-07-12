@@ -22,7 +22,7 @@ type Server interface {
 	IsIdle() bool
 	SetIdle(bool)
 	GetPort() uint16
-	Invoke(input map[string]interface{}) (io.ReadCloser, error)
+	Invoke(input Message) (io.ReadCloser, error)
 	Stdout() *bytes.Buffer
 	Stderr() *bytes.Buffer
 	Start() error
@@ -117,17 +117,10 @@ func (s *DefaultServer) GetPort() uint16 {
 }
 
 // Invoke calls the server with the given input to invoke a Dispatch function
-func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, error) {
+func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 	p, err := json.Marshal(input)
 
-	ctx, ok := input["context"].(map[string]interface{})
-	if !ok {
-		return nil, BadRequestError(p)
-	}
-	timeout := 0.0
-	if ctx["timeout"] != nil {
-		timeout = ctx["timeout"].(float64)
-	}
+	timeout := input.Context.Timeout
 
 	s.client.Timeout = time.Duration(timeout) * time.Millisecond
 
@@ -135,7 +128,7 @@ func (s *DefaultServer) Invoke(input map[string]interface{}) (io.ReadCloser, err
 
 	if err != nil {
 		if strings.Contains(err.Error(), "Client.Timeout") {
-			return nil, TimeoutError(fmt.Sprintf("%g", timeout))
+			return nil, TimeoutError(fmt.Sprintf("%d", timeout))
 		} else if strings.Contains(err.Error(), "connection refused") {
 			return nil, errors.New("connection refused")
 		}

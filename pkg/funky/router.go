@@ -21,7 +21,7 @@ const FirstPort uint16 = 9000
 
 // Router an interface for delegating function invocations to idle servers
 type Router interface {
-	Delegate(input map[string]interface{}) (*Response, error)
+	Delegate(input Message) (*Message, error)
 	Shutdown() error
 }
 
@@ -51,7 +51,7 @@ func NewRouter(numServers int, serverFactory ServerFactory) (*DefaultRouter, err
 }
 
 // Delegate delegates function invocation to an idle server
-func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error) {
+func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 	server, err := r.findFreeServer()
 	if err != nil {
 		return nil, err
@@ -111,8 +111,8 @@ func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error
 	}
 
 	context := Context{
-		Logs:  logs,
-		Error: e,
+		Logs:  &logs,
+		Error: &e,
 	}
 
 	respBuf := new(bytes.Buffer)
@@ -122,8 +122,8 @@ func (r *DefaultRouter) Delegate(input map[string]interface{}) (*Response, error
 	respPayload := make(map[string]interface{})
 	json.Unmarshal(respBuf.Bytes(), &respPayload)
 
-	response := &Response{
-		Context: context,
+	response := &Message{
+		Context: &context,
 		Payload: respPayload,
 	}
 

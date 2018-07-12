@@ -59,9 +59,9 @@ func TestInvokeSuccess(t *testing.T) {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
 
-	req := map[string]interface{}{
-		"context": map[string]interface{}{
-			"timeout": float64(0),
+	req := funky.Message{
+		Context: &funky.Context{
+			Timeout: 0,
 		},
 	}
 
@@ -90,6 +90,7 @@ func TestInvokeBadRequest(t *testing.T) {
 			"myField": "Hello, Jon from Winterfell",
 		}
 		respBytes, _ := json.Marshal(resp)
+		w.WriteHeader(400)
 		fmt.Fprint(w, string(respBytes))
 	}))
 	defer ts.Close()
@@ -105,7 +106,9 @@ func TestInvokeBadRequest(t *testing.T) {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
 
-	req := map[string]interface{}{}
+	req := funky.Message{
+		Context: &funky.Context{},
+	}
 
 	_, err = server.Invoke(req)
 

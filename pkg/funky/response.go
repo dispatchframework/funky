@@ -7,16 +7,17 @@ const (
 	SystemError   = "SystemError"
 )
 
-// Response a struct to hold the response to a Dispatch function invocation
-type Response struct {
-	Context Context     `json:"context"`
+// Message a struct to hold the response to a Dispatch function invocation
+type Message struct {
+	Context *Context    `json:"context"`
 	Payload interface{} `json:"payload"`
 }
 
 // Context a struct to hold the context of a Dispatch function invocation
 type Context struct {
-	Error Error `json:"error"`
-	Logs  Logs  `json:"logs"`
+	Error   *Error `json:"error"`
+	Logs    *Logs  `json:"logs"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 // Error a struct to hold the error status of a Dispatch function invocation

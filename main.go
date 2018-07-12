@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,17 +27,12 @@ type funkyHandler struct {
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	reader := r.Body
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(reader)
-	rawBody := buf.Bytes()
-	var body map[string]interface{}
-	err := json.Unmarshal(rawBody, &body)
+	var body funky.Message
+	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
-		resp := funky.Response{
-			Context: funky.Context{
-				Error: funky.Error{
+		resp := funky.Message{
+			Context: &funky.Context{
+				Error: &funky.Error{
 					ErrorType: funky.InputError,
 					Message:   "Invalid Input",
 				},
@@ -87,8 +81,8 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c
-		router.Shutdown()
 		server.Shutdown(context.TODO())
+		router.Shutdown()
 		os.Exit(0)
 	}()
 
