@@ -5,6 +5,7 @@
 package funky
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,20 +24,22 @@ import (
 type Server interface {
 	GetPort() uint16
 	Invoke(input Message) (io.ReadCloser, error)
-	Stdout() io.Reader
-	Stderr() io.Reader
+	Stdout() []string
+	Stderr() []string
 	Start() error
 	Shutdown() error
+	Terminate() error
 }
 
 // DefaultServer a struct to hold information about running servers
 type DefaultServer struct {
-	isIdle bool
 	port   uint16
 	cmd    *exec.Cmd
 	client *http.Client
-	stdout *bytes.Buffer
-	stderr *bytes.Buffer
+
+	lock   sync.RWMutex
+	stdout []string
+	stderr []string
 }
 
 // NewServer returns a new DefaultServer with the given port and command
@@ -46,18 +50,10 @@ func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
 
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
 
-	stdoutBuf, stderrBuf := &bytes.Buffer{}, &bytes.Buffer{}
-
-	cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
-
 	return &DefaultServer{
-		isIdle: true,
 		port:   port,
 		cmd:    cmd,
 		client: &http.Client{},
-		stdout: stdoutBuf,
-		stderr: stderrBuf,
 	}, nil
 }
 
@@ -105,8 +101,7 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 
 	s.client.Timeout = time.Duration(timeout) * time.Millisecond
 
-	s.stdout.Reset()
-	s.stderr.Reset()
+	s.resetStreams()
 
 	resp, err := s.client.Post(fmt.Sprintf("http://127.0.0.1:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
 
@@ -133,17 +128,60 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 }
 
 // Stdout returns the Buffer containing stdout
-func (s *DefaultServer) Stdout() io.Reader {
+func (s *DefaultServer) Stdout() []string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.stdout
 }
 
 // Stderr returns the Buffer containing stderr
-func (s *DefaultServer) Stderr() io.Reader {
+func (s *DefaultServer) Stderr() []string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.stderr
+}
+
+func (s *DefaultServer) resetStreams() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.stdout = nil
+	s.stderr = nil
+}
+
+func scanStream(r io.Reader, ss *[]string, l sync.Locker) {
+	s := bufio.NewScanner(r)
+	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, io.EOF
+		}
+
+		for i := 0; i < len(data); i++ {
+			if data[i] == '\n' {
+				return i + 1, data[:i], nil
+			}
+		}
+
+		return len(data), data, nil
+	})
+	for s.Scan() {
+		func() {
+			l.Lock()
+			defer l.Unlock()
+			*ss = append(*ss, s.Text())
+		}()
+	}
 }
 
 // Start starts the server
 func (s *DefaultServer) Start() error {
+
+	stdout, _ := s.cmd.StdoutPipe()
+	stderr, _ := s.cmd.StderrPipe()
+
+	go scanStream(stdout, &s.stdout, &s.lock)
+	go scanStream(stderr, &s.stderr, &s.lock)
+
 	return s.cmd.Start()
 }
 
@@ -155,4 +193,8 @@ func (s *DefaultServer) Shutdown() error {
 	}
 
 	return err
+}
+
+func (s *DefaultServer) Terminate() error {
+	return s.cmd.Process.Kill()
 }

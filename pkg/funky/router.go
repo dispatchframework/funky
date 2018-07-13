@@ -5,13 +5,11 @@
 package funky
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 
 	"golang.org/x/sync/semaphore"
@@ -28,9 +26,10 @@ type Router interface {
 
 // DefaultRouter a struct that hold servers that can be delegated to
 type DefaultRouter struct {
-	servers []Server
-	mutex   *sync.Mutex
-	sem     *semaphore.Weighted
+	servers       []Server
+	serverFactory ServerFactory
+	mutex         *sync.Mutex
+	sem           *semaphore.Weighted
 }
 
 // NewRouter constructor for DefaultRouters
@@ -45,9 +44,10 @@ func NewRouter(numServers int, serverFactory ServerFactory) (*DefaultRouter, err
 	}
 
 	return &DefaultRouter{
-		servers: servers,
-		mutex:   &sync.Mutex{},
-		sem:     semaphore.NewWeighted(int64(numServers)),
+		servers:       servers,
+		serverFactory: serverFactory,
+		mutex:         &sync.Mutex{},
+		sem:           semaphore.NewWeighted(int64(numServers)),
 	}, nil
 }
 
@@ -58,57 +58,47 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 		return nil, err
 	}
 
-	defer r.releaseServer(server)
+	defer func() {
+		r.releaseServer(server)
+	}()
 
 	var e Error
 	resp, err := server.Invoke(input)
 	if resp != nil {
 		defer resp.Close()
 	}
+
+	logs := Logs{
+		Stdout: server.Stdout(),
+		Stderr: server.Stderr(),
+	}
+
 	if err != nil {
 		switch err.(type) {
 		case TimeoutError:
+			server.Terminate()
+			server, _ = r.serverFactory.CreateServer(server.GetPort())
+			server.Start()
 			e = Error{
 				ErrorType: FunctionError,
 				Message:   err.Error(),
 			}
-			break
-		case BadRequestError:
-			e = Error{
-				ErrorType: InputError,
-				Message:   err.Error(),
-			}
-			break
 		case InvocationError:
 			e = Error{
 				ErrorType: FunctionError,
 				Message:   err.Error(),
 			}
-			break
-		case InvalidResponsePayloadError:
+		case BadRequestError, InvalidResponsePayloadError:
 			e = Error{
 				ErrorType: InputError,
 				Message:   err.Error(),
 			}
-			break
-		case UnknownSystemError:
-			e = Error{
-				ErrorType: SystemError,
-				Message:   err.Error(),
-			}
-			break
 		default:
 			e = Error{
 				ErrorType: SystemError,
 				Message:   err.Error(),
 			}
-			break
 		}
-	}
-
-	logs := Logs{
-		Stdout: splitLogsOnNewline(server.Stdout()),
-		Stderr: splitLogsOnNewline(server.Stderr()),
 	}
 
 	context := Context{
@@ -183,14 +173,4 @@ func (r *DefaultRouter) releaseServer(server Server) {
 
 	r.servers = append(r.servers, server)
 	r.sem.Release(1)
-}
-
-func splitLogsOnNewline(r io.Reader) []string {
-	var result []string
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		result = append(result, s.Text())
-	}
-
-	return result
 }
