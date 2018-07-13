@@ -5,12 +5,13 @@
 package funky
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"io"
 	"sync"
 
 	"golang.org/x/sync/semaphore"
@@ -161,39 +162,35 @@ func createServers(numServers int, serverFactory ServerFactory) ([]Server, error
 }
 
 func (r *DefaultRouter) findFreeServer() (Server, error) {
-	var ret Server
-
-	r.sem.Acquire(context.TODO(), 1)
-	for _, server := range r.servers {
-		r.mutex.Lock()
-		if server.IsIdle() {
-			server.SetIdle(false)
-			ret = server
-		}
-		r.mutex.Unlock()
-		if ret != nil {
-			break
-		}
+	if err := r.sem.Acquire(context.TODO(), 1); err != nil {
+		return nil, err
 	}
 
-	if ret == nil {
-		r.sem.Release(1)
-		return nil, errors.New("no free server")
-	}
+	// if we're here, it's guaranteed we have at least one element in servers
 
-	return ret, nil
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	server := r.servers[len(r.servers)-1]
+	r.servers = r.servers[:len(r.servers)-1]
+
+	return server, nil
 }
 
 func (r *DefaultRouter) releaseServer(server Server) {
 	r.mutex.Lock()
-	server.SetIdle(true)
-	r.mutex.Unlock()
+	defer r.mutex.Unlock()
+
+	r.servers = append(r.servers, server)
 	r.sem.Release(1)
 }
 
-func splitLogsOnNewline(stdBuffer *bytes.Buffer) []string {
-	b, _ := stdBuffer.ReadBytes(0)
-	b = bytes.TrimRight(b, "\x0000")
-	stdBuffer.UnreadByte()
-	return strings.Split(string(b), "\n")
+func splitLogsOnNewline(r io.Reader) []string {
+	var result []string
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		result = append(result, s.Text())
+	}
+
+	return result
 }

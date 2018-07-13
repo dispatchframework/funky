@@ -45,9 +45,7 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, _ := f.router.Delegate(body)
 
-	out, _ := json.Marshal(resp)
-
-	fmt.Fprintf(w, string(out))
+	json.NewEncoder(w).Encode(resp)
 }
 
 func main() {

@@ -13,18 +13,17 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Server an interface for managing function servers
 type Server interface {
-	IsIdle() bool
-	SetIdle(bool)
 	GetPort() uint16
 	Invoke(input Message) (io.ReadCloser, error)
-	Stdout() *bytes.Buffer
-	Stderr() *bytes.Buffer
+	Stdout() io.Reader
+	Stderr() io.Reader
 	Start() error
 	Shutdown() error
 }
@@ -49,8 +48,8 @@ func NewServer(port uint16, cmd *exec.Cmd) (*DefaultServer, error) {
 
 	stdoutBuf, stderrBuf := &bytes.Buffer{}, &bytes.Buffer{}
 
-	cmd.Stdout = stdoutBuf
-	cmd.Stderr = stderrBuf
+	cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 
 	return &DefaultServer{
 		isIdle: true,
@@ -81,17 +80,9 @@ func NewDefaultServerFactory(serverCmd string) (ServerFactory, error) {
 		return nil, IllegalArgumentError(serverCmd)
 	}
 
-	var args []string
-	if len(cmds) < 2 {
-		args = []string{}
-	} else {
-		args = cmds[1:]
-
-	}
-
 	return &DefaultServerFactory{
 		cmd:  cmds[0],
-		args: args,
+		args: cmds[1:],
 	}, nil
 }
 
@@ -99,16 +90,6 @@ func NewDefaultServerFactory(serverCmd string) (ServerFactory, error) {
 func (f *DefaultServerFactory) CreateServer(port uint16) (Server, error) {
 	cmd := exec.Command(f.cmd, f.args...)
 	return NewServer(port, cmd)
-}
-
-// IsIdle indicates whether this server is currently idle or processing a request
-func (s *DefaultServer) IsIdle() bool {
-	return s.isIdle
-}
-
-// SetIdle sets whether this server is currently idle or processing a request
-func (s *DefaultServer) SetIdle(idle bool) {
-	s.isIdle = idle
 }
 
 // GetPort returns the port this server is running on
@@ -124,6 +105,9 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 
 	s.client.Timeout = time.Duration(timeout) * time.Millisecond
 
+	s.stdout.Reset()
+	s.stderr.Reset()
+
 	resp, err := s.client.Post(fmt.Sprintf("http://127.0.0.1:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
 
 	if err != nil {
@@ -138,7 +122,7 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 	case 400:
 		return nil, BadRequestError("invalid input")
 	case 500:
-		return nil, InvocationError(resp.StatusCode)
+		return nil, InvocationError(strconv.Itoa(resp.StatusCode))
 	case 422:
 		return nil, InvalidResponsePayloadError("")
 	case 502:
@@ -149,12 +133,12 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 }
 
 // Stdout returns the Buffer containing stdout
-func (s *DefaultServer) Stdout() *bytes.Buffer {
+func (s *DefaultServer) Stdout() io.Reader {
 	return s.stdout
 }
 
 // Stderr returns the Buffer containing stderr
-func (s *DefaultServer) Stderr() *bytes.Buffer {
+func (s *DefaultServer) Stderr() io.Reader {
 	return s.stderr
 }
 
