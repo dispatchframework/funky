@@ -195,6 +195,7 @@ func (s *DefaultServer) Shutdown() error {
 	return err
 }
 
+// Terminate kills the server without waiting for a graceful shutdown.
 func (s *DefaultServer) Terminate() error {
 	return s.cmd.Process.Kill()
 }

@@ -1,6 +1,7 @@
 package funky
 
-var Healthy = true
+// Healthy a channel for reporting the health of the web service.
+var Healthy = make(chan bool)
 
 // Constants indicating the types of errors for Dispatch function invocation
 const (

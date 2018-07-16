@@ -76,14 +76,15 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 	if err != nil {
 		switch err.(type) {
 		case TimeoutError:
-			server.Terminate()
-			server, serverErr := r.serverFactory.CreateServer(server.GetPort())
-			if serverErr != nil {
-				Healthy = false
+			terminateErr := server.Terminate()
+			newServer, serverErr := r.serverFactory.CreateServer(server.GetPort())
+			if serverErr != nil || terminateErr != nil {
+				Healthy <- false
 			} else {
 				if server.Start() != nil {
-					Healthy = false
+					Healthy <- false
 				}
+				server = newServer
 			}
 			e = Error{
 				ErrorType: FunctionError,
@@ -177,6 +178,8 @@ func (r *DefaultRouter) releaseServer(server Server) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.servers = append(r.servers, server)
+	if server != nil {
+		r.servers = append(r.servers, server)
+	}
 	r.sem.Release(1)
 }
