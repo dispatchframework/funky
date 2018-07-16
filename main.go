@@ -67,12 +67,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed creating new router: %+v", err)
 	}
+
 	handler := funkyHandler{
 		router: router,
 	}
+
+	servMux := http.NewServeMux()
+	servMux.Handle("/", handler)
+	servMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if !funky.Healthy {
+			w.WriteHeader(500)
+		}
+
+		w.Write([]byte("{}"))
+	})
+
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: handler,
+		Handler: servMux,
 	}
 
 	c := make(chan os.Signal, 1)

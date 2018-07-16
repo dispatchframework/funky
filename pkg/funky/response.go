@@ -1,5 +1,7 @@
 package funky
 
+var Healthy = true
+
 // Constants indicating the types of errors for Dispatch function invocation
 const (
 	InputError    = "InputError"

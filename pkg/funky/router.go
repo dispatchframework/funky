@@ -77,8 +77,14 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 		switch err.(type) {
 		case TimeoutError:
 			server.Terminate()
-			server, _ = r.serverFactory.CreateServer(server.GetPort())
-			server.Start()
+			server, serverErr := r.serverFactory.CreateServer(server.GetPort())
+			if serverErr != nil {
+				Healthy = false
+			} else {
+				if server.Start() != nil {
+					Healthy = false
+				}
+			}
 			e = Error{
 				ErrorType: FunctionError,
 				Message:   err.Error(),
