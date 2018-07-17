@@ -36,7 +36,7 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Context: &funky.Context{
 				Error: &funky.Error{
 					ErrorType: funky.InputError,
-					Message:   "Invalid Input",
+					Message:   fmt.Sprintf("Invalid Input: %s", err),
 				},
 			},
 		}
@@ -53,7 +53,7 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func healthListener() {
 	for {
 		select {
-			case healthy = <- funky.Healthy
+		case healthy = <-funky.Healthy:
 		}
 	}
 }

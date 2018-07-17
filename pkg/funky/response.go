@@ -1,5 +1,7 @@
 package funky
 
+import "time"
+
 // Healthy a channel for reporting the health of the web service.
 var Healthy = make(chan bool)
 
@@ -18,9 +20,9 @@ type Message struct {
 
 // Context a struct to hold the context of a Dispatch function invocation
 type Context struct {
-	Error   *Error `json:"error"`
-	Logs    *Logs  `json:"logs"`
-	Timeout int    `json:"timeout,omitempty"`
+	Error    *Error    `json:"error"`
+	Logs     *Logs     `json:"logs"`
+	Deadline time.Time `json:"deadline,omitempty"`
 }
 
 // Error a struct to hold the error status of a Dispatch function invocation

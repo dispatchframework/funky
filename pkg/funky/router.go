@@ -81,7 +81,7 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 			if serverErr != nil || terminateErr != nil {
 				Healthy <- false
 			} else {
-				if server.Start() != nil {
+				if newServer.Start() != nil {
 					Healthy <- false
 				}
 				server = newServer

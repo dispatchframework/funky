@@ -97,9 +97,13 @@ func (s *DefaultServer) GetPort() uint16 {
 func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 	p, err := json.Marshal(input)
 
-	timeout := input.Context.Timeout
+	timeout := time.Until(input.Context.Deadline)
 
-	s.client.Timeout = time.Duration(timeout) * time.Millisecond
+	if timeout < 0 {
+		return nil, TimeoutError("Did not invoke, already exceeded timeout")
+	}
+
+	s.client.Timeout = timeout
 
 	s.resetStreams()
 
@@ -107,7 +111,7 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "Client.Timeout") {
-			return nil, TimeoutError(fmt.Sprintf("%d", timeout))
+			return nil, TimeoutError(timeout)
 		} else if strings.Contains(err.Error(), "connection refused") {
 			return nil, errors.New("connection refused")
 		}
