@@ -18,6 +18,9 @@ import (
 // FirstPort the starting port number for servers created by a Router
 const FirstPort uint16 = 9000
 
+// Healthy a channel for reporting the health of the web service.
+var Healthy = make(chan struct{})
+
 // Router an interface for delegating function invocations to idle servers
 type Router interface {
 	Delegate(input Message) (*Message, error)
@@ -76,13 +79,16 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 	if err != nil {
 		switch err.(type) {
 		case TimeoutError:
+			defer func() {
+				recover()
+			}()
 			terminateErr := server.Terminate()
 			newServer, serverErr := r.serverFactory.CreateServer(server.GetPort())
 			if serverErr != nil || terminateErr != nil {
-				Healthy <- false
+				close(Healthy)
 			} else {
 				if newServer.Start() != nil {
-					Healthy <- false
+					close(Healthy)
 				}
 				server = newServer
 			}
@@ -178,8 +184,7 @@ func (r *DefaultRouter) releaseServer(server Server) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if server != nil {
-		r.servers = append(r.servers, server)
-	}
+	r.servers = append(r.servers, server)
+
 	r.sem.Release(1)
 }

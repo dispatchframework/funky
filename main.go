@@ -17,8 +17,6 @@ import (
 	"github.com/dispatchframework/funky/pkg/funky"
 )
 
-var healthy = true
-
 const (
 	serversEnvVar   = "SERVERS"
 	serverCmdEnvVar = "SERVER_CMD"
@@ -50,11 +48,12 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func healthListener() {
-	for {
-		select {
-		case healthy = <-funky.Healthy:
-		}
+func healthy(c <-chan struct{}) bool {
+	select {
+	case <-c:
+		return false
+	default:
+		return true
 	}
 }
 
@@ -85,14 +84,12 @@ func main() {
 	servMux := http.NewServeMux()
 	servMux.Handle("/", handler)
 	servMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		if !healthy {
+		if !healthy(funky.Healthy) {
 			w.WriteHeader(500)
 		}
 
 		w.Write([]byte("{}"))
 	})
-
-	go healthListener()
 
 	server := &http.Server{
 		Addr:    ":8080",

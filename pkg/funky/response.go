@@ -2,9 +2,6 @@ package funky
 
 import "time"
 
-// Healthy a channel for reporting the health of the web service.
-var Healthy = make(chan bool)
-
 // Constants indicating the types of errors for Dispatch function invocation
 const (
 	InputError    = "InputError"
