@@ -24,7 +24,7 @@ type Context struct {
 
 // Error a struct to hold the error status of a Dispatch function invocation
 type Error struct {
-	ErrorType  string   `json:"error"`
+	ErrorType  string   `json:"type"`
 	Message    string   `json:"message"`
 	Stacktrace []string `json:"stacktrace"`
 }
