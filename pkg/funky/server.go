@@ -21,7 +21,7 @@ import (
 // Server an interface for managing function servers
 type Server interface {
 	GetPort() uint16
-	Invoke(input *Message) (io.ReadCloser, error)
+	Invoke(input *Message) (interface{}, error)
 	Stdout() []string
 	Stderr() []string
 	Start() error
@@ -92,7 +92,7 @@ func (s *DefaultServer) GetPort() uint16 {
 }
 
 // Invoke calls the server with the given input to invoke a Dispatch function
-func (s *DefaultServer) Invoke(input *Message) (io.ReadCloser, error) {
+func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 	p, err := json.Marshal(input)
 
 	var timeout time.Duration
@@ -112,6 +112,9 @@ func (s *DefaultServer) Invoke(input *Message) (io.ReadCloser, error) {
 
 	url := fmt.Sprintf("http://127.0.0.1:%d", s.GetPort())
 	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(p))
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
 	if err != nil {
 		if isTimeout(err) {
@@ -131,7 +134,12 @@ func (s *DefaultServer) Invoke(input *Message) (io.ReadCloser, error) {
 		}
 	}
 
-	return resp.Body, nil
+	var result interface{}
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, InvalidResponsePayloadError(err.Error())
+	}
+
+	return result, nil
 }
 
 // Stdout returns the Buffer containing stdout

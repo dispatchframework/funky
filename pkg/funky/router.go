@@ -6,7 +6,6 @@ package funky
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -66,9 +65,6 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 
 	var e Error
 	resp, err := server.Invoke(input)
-	if resp != nil {
-		defer resp.Close()
-	}
 
 	logs := Logs{
 		Stdout: server.Stdout(),
@@ -110,14 +106,9 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 		Error: &e,
 	}
 
-	respPayload := make(map[string]interface{})
-	if resp != nil {
-		json.NewDecoder(resp).Decode(&respPayload)
-	}
-
 	response := &Message{
 		Context: &ctx,
-		Payload: respPayload,
+		Payload: resp,
 	}
 
 	return response, nil

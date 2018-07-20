@@ -5,10 +5,8 @@
 package test
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -69,12 +67,9 @@ func TestInvokeSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buff := &bytes.Buffer{}
-	buff.ReadFrom(resp)
-	obj := make(map[string]interface{})
-	err = json.Unmarshal(buff.Bytes(), &obj)
-	if err != nil {
-		log.Fatal(err)
+	obj, ok := resp.(map[string]interface{})
+	if !ok {
+		t.Fatal("resp not of type map[string]interface")
 	}
 
 	if _, ok := obj["myField"]; !ok {
