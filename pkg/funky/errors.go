@@ -22,6 +22,14 @@ func (e TimeoutError) Error() string {
 	return fmt.Sprintf("The invocation exceeded the timeout: %s", string(e))
 }
 
+type FunctionServerError struct {
+	APIError Error
+}
+
+func (e FunctionServerError) Error() string {
+	return "The function server encountered an error. See APIError field for more detail"
+}
+
 // ConnectionRefusedError An error indicating that the http connection to the function server was refused
 type ConnectionRefusedError string
 

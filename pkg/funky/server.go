@@ -8,13 +8,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -107,25 +105,23 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 
 	s.resetStreams()
 
-	resp, err := s.client.Post(fmt.Sprintf("http://127.0.0.1:%d", s.GetPort()), "application/json", bytes.NewBuffer(p))
+	url := fmt.Sprintf("http://127.0.0.1:%d", s.GetPort())
+	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(p))
 
 	if err != nil {
 		if strings.Contains(err.Error(), "Client.Timeout") {
 			return nil, TimeoutError(timeout)
 		} else if strings.Contains(err.Error(), "connection refused") {
-			return nil, errors.New("connection refused")
+			return nil, ConnectionRefusedError(url)
 		}
 	}
 
-	switch resp.StatusCode {
-	case 400:
-		return nil, BadRequestError("invalid input")
-	case 500:
-		return nil, InvocationError(strconv.Itoa(resp.StatusCode))
-	case 422:
-		return nil, InvalidResponsePayloadError("")
-	case 502:
-		return nil, UnknownSystemError("")
+	if resp.StatusCode >= 400 {
+		var e Error
+		json.NewDecoder(resp.Body).Decode(&e)
+		return nil, FunctionServerError{
+			APIError: e,
+		}
 	}
 
 	return resp.Body, nil

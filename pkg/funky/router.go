@@ -5,7 +5,6 @@
 package funky
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -77,7 +76,7 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 	}
 
 	if err != nil {
-		switch err.(type) {
+		switch v := err.(type) {
 		case TimeoutError:
 			defer func() {
 				recover()
@@ -96,16 +95,8 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 				ErrorType: FunctionError,
 				Message:   err.Error(),
 			}
-		case InvocationError:
-			e = Error{
-				ErrorType: FunctionError,
-				Message:   err.Error(),
-			}
-		case BadRequestError, InvalidResponsePayloadError:
-			e = Error{
-				ErrorType: InputError,
-				Message:   err.Error(),
-			}
+		case FunctionServerError:
+			e = v.APIError
 		default:
 			e = Error{
 				ErrorType: SystemError,
@@ -119,12 +110,10 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 		Error: &e,
 	}
 
-	respBuf := new(bytes.Buffer)
-	if resp != nil {
-		respBuf.ReadFrom(resp)
-	}
 	respPayload := make(map[string]interface{})
-	json.Unmarshal(respBuf.Bytes(), &respPayload)
+	if resp != nil {
+		json.NewDecoder(resp).Decode(&respPayload)
+	}
 
 	response := &Message{
 		Context: &context,
