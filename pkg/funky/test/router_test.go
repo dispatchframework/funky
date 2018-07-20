@@ -5,7 +5,6 @@
 package test
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
@@ -73,16 +72,16 @@ func TestDelegateSuccess(t *testing.T) {
 	server.On("Start").Return(nil)
 	server.On("IsIdle").Return(true)
 	server.On("SetIdle", mock.AnythingOfType("bool")).Return().Return()
-	server.On("Invoke", funky.Message{}).Return(nil, nil)
-	server.On("Stdout").Return(&bytes.Buffer{})
-	server.On("Stderr").Return(&bytes.Buffer{})
+	server.On("Invoke", &funky.Message{}).Return(nil, nil)
+	server.On("Stdout").Return([]string{})
+	server.On("Stderr").Return([]string{})
 
 	serverFactory := new(mocks.ServerFactory)
 	serverFactory.On("CreateServer", uint16(funky.FirstPort)).Return(server, nil)
 
 	router, _ := funky.NewRouter(1, serverFactory)
 
-	_, err := router.Delegate(funky.Message{})
+	_, err := router.Delegate(&funky.Message{})
 
 	if err != nil {
 		t.Error("Received unexpected error calling Delegate")

@@ -22,7 +22,7 @@ var Healthy = make(chan struct{})
 
 // Router an interface for delegating function invocations to idle servers
 type Router interface {
-	Delegate(input Message) (*Message, error)
+	Delegate(input *Message) (*Message, error)
 	Shutdown() error
 }
 
@@ -54,7 +54,7 @@ func NewRouter(numServers int, serverFactory ServerFactory) (*DefaultRouter, err
 }
 
 // Delegate delegates function invocation to an idle server
-func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
+func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 	server, err := r.findFreeServer()
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 		}
 	}
 
-	context := Context{
+	ctx := Context{
 		Logs:  &logs,
 		Error: &e,
 	}
@@ -116,7 +116,7 @@ func (r *DefaultRouter) Delegate(input Message) (*Message, error) {
 	}
 
 	response := &Message{
-		Context: &context,
+		Context: &ctx,
 		Payload: respPayload,
 	}
 

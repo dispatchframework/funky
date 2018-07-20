@@ -43,7 +43,7 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, _ := f.router.Delegate(body)
+	resp, _ := f.router.Delegate(&body)
 
 	json.NewEncoder(w).Encode(resp)
 }

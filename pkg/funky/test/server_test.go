@@ -60,12 +60,10 @@ func TestInvokeSuccess(t *testing.T) {
 	}
 
 	req := funky.Message{
-		Context: &funky.Context{
-			Timeout: 0,
-		},
+		Context: &funky.Context{},
 	}
 
-	resp, err := server.Invoke(req)
+	resp, err := server.Invoke(&req)
 
 	if err != nil {
 		t.Fatal(err)
@@ -110,13 +108,13 @@ func TestInvokeBadRequest(t *testing.T) {
 		Context: &funky.Context{},
 	}
 
-	_, err = server.Invoke(req)
+	_, err = server.Invoke(&req)
 
 	if err == nil {
 		t.Fatalf("Expected BadRequest error, instead got no error")
 	}
 
-	if _, ok := err.(funky.BadRequestError); !ok {
-		t.Errorf("Expected BadRequestError got %s", err)
+	if _, ok := err.(funky.FunctionServerError); !ok {
+		t.Errorf("Expected FunctionServerError got %s", err)
 	}
 }

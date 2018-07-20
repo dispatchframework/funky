@@ -21,7 +21,7 @@ import (
 // Server an interface for managing function servers
 type Server interface {
 	GetPort() uint16
-	Invoke(input Message) (io.ReadCloser, error)
+	Invoke(input *Message) (io.ReadCloser, error)
 	Stdout() []string
 	Stderr() []string
 	Start() error
@@ -92,10 +92,15 @@ func (s *DefaultServer) GetPort() uint16 {
 }
 
 // Invoke calls the server with the given input to invoke a Dispatch function
-func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
+func (s *DefaultServer) Invoke(input *Message) (io.ReadCloser, error) {
 	p, err := json.Marshal(input)
 
-	timeout := time.Until(input.Context.Deadline)
+	var timeout time.Duration
+	if (input.Context.Deadline == time.Time{}) {
+		timeout = 0
+	} else {
+		timeout = time.Until(input.Context.Deadline)
+	}
 
 	if timeout < 0 {
 		return nil, TimeoutError("Did not invoke, already exceeded timeout")
@@ -109,10 +114,12 @@ func (s *DefaultServer) Invoke(input Message) (io.ReadCloser, error) {
 	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(p))
 
 	if err != nil {
-		if strings.Contains(err.Error(), "Client.Timeout") {
+		if isTimeout(err) {
 			return nil, TimeoutError(timeout)
-		} else if strings.Contains(err.Error(), "connection refused") {
+		} else if isConnectionRefused(err) {
 			return nil, ConnectionRefusedError(url)
+		} else {
+			return nil, UnknownSystemError(err.Error())
 		}
 	}
 
@@ -198,4 +205,16 @@ func (s *DefaultServer) Shutdown() error {
 // Terminate kills the server without waiting for a graceful shutdown.
 func (s *DefaultServer) Terminate() error {
 	return s.cmd.Process.Kill()
+}
+
+func isTimeout(err error) bool {
+	type hasTimeout interface {
+		Timeout() bool
+	}
+	e, ok := err.(hasTimeout)
+	return ok && e.Timeout()
+}
+
+func isConnectionRefused(err error) bool {
+	return strings.Contains(err.Error(), "connection refused")
 }
