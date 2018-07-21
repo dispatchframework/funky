@@ -60,7 +60,9 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 	}
 
 	defer func() {
-		r.releaseServer(server)
+		if server != nil {
+			r.releaseServer(server)
+		}
 	}()
 
 	var e Error
@@ -78,6 +80,7 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 				recover()
 			}()
 			terminateErr := server.Terminate()
+			server = nil
 			newServer, serverErr := r.serverFactory.CreateServer(server.GetPort())
 			if serverErr != nil || terminateErr != nil {
 				close(Healthy)

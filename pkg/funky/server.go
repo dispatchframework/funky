@@ -112,7 +112,7 @@ func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 
 	url := fmt.Sprintf("http://127.0.0.1:%d", s.GetPort())
 	resp, err := s.client.Post(url, "application/json", bytes.NewBuffer(p))
-	if resp != nil && resp.Body != nil {
+	if err == nil {
 		defer resp.Body.Close()
 	}
 
@@ -135,7 +135,7 @@ func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 	}
 
 	var result interface{}
-	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, InvalidResponsePayloadError(err.Error())
 	}
 
