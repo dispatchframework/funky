@@ -96,10 +96,10 @@ func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 	p, err := json.Marshal(input)
 
 	var timeout time.Duration
-	if (input.Context.Deadline == time.Time{}) {
+	if (*input.Context.Deadline == time.Time{}) {
 		timeout = 0
 	} else {
-		timeout = time.Until(input.Context.Deadline)
+		timeout = time.Until(*input.Context.Deadline)
 	}
 
 	if timeout < 0 {
