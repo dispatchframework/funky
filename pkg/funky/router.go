@@ -107,11 +107,8 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 	}
 
 	ctx := Context{
-		Logs: &logs,
-	}
-
-	if e != nil {
-		ctx.Error = e
+		Error: e,
+		Logs:  &logs,
 	}
 
 	response := &Message{

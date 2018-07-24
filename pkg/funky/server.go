@@ -95,10 +95,8 @@ func (s *DefaultServer) GetPort() uint16 {
 func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 	p, err := json.Marshal(input)
 
-	var timeout time.Duration
-	if (*input.Context.Deadline == time.Time{}) {
-		timeout = 0
-	} else {
+	timeout := time.Duration(0)
+	if input.Context.Deadline != nil {
 		timeout = time.Until(*input.Context.Deadline)
 	}
 
