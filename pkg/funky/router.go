@@ -65,7 +65,7 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 		}
 	}()
 
-	var e Error
+	var e *Error
 	resp, err := server.Invoke(input)
 
 	logs := Logs{
@@ -77,11 +77,13 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 		switch v := err.(type) {
 		case TimeoutError:
 			defer func() {
-				recover()
+				if r := recover(); r != nil {
+					fmt.Println("recovered", r)
+				}
 			}()
 			terminateErr := server.Terminate()
-			server = nil
 			newServer, serverErr := r.serverFactory.CreateServer(server.GetPort())
+			server = nil
 			if serverErr != nil || terminateErr != nil {
 				close(Healthy)
 			} else {
@@ -90,14 +92,14 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 				}
 				server = newServer
 			}
-			e = Error{
+			e = &Error{
 				ErrorType: FunctionError,
 				Message:   err.Error(),
 			}
 		case FunctionServerError:
-			e = v.APIError
+			e = &v.APIError
 		default:
-			e = Error{
+			e = &Error{
 				ErrorType: SystemError,
 				Message:   err.Error(),
 			}
@@ -105,8 +107,8 @@ func (r *DefaultRouter) Delegate(input *Message) (*Message, error) {
 	}
 
 	ctx := Context{
+		Error: e,
 		Logs:  &logs,
-		Error: &e,
 	}
 
 	response := &Message{

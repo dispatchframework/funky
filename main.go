@@ -20,6 +20,7 @@ import (
 const (
 	serversEnvVar   = "SERVERS"
 	serverCmdEnvVar = "SERVER_CMD"
+	portEnvVar      = "PORT"
 )
 
 type funkyHandler struct {
@@ -91,8 +92,13 @@ func main() {
 		w.Write([]byte("{}"))
 	})
 
+	port := os.Getenv(portEnvVar)
+	if port == "" {
+		port = "8080"
+	}
+
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + port,
 		Handler: servMux,
 	}
 
