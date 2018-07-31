@@ -19,7 +19,7 @@ func (e IllegalArgumentError) Error() string {
 type TimeoutError string
 
 func (e TimeoutError) Error() string {
-	return fmt.Sprintf("The invocation exceeded the timeout: %s", string(e))
+	return string(e)
 }
 
 // FunctionServerError a generic error indicating that the function server experienced an error

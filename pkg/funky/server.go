@@ -116,7 +116,7 @@ func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
 
 	if err != nil {
 		if isTimeout(err) {
-			return nil, TimeoutError(timeout)
+			return nil, TimeoutError("Function execution exceeded the timeout")
 		} else if isConnectionRefused(err) {
 			return nil, ConnectionRefusedError(url)
 		} else {
