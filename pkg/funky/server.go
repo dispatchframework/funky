@@ -21,7 +21,7 @@ import (
 // Server an interface for managing function servers
 type Server interface {
 	GetPort() uint16
-	Invoke(input *Message) (interface{}, error)
+	Invoke(input map[string]interface{}) (interface{}, error)
 	Stdout() []string
 	Stderr() []string
 	Start() error
@@ -92,12 +92,28 @@ func (s *DefaultServer) GetPort() uint16 {
 }
 
 // Invoke calls the server with the given input to invoke a Dispatch function
-func (s *DefaultServer) Invoke(input *Message) (interface{}, error) {
+func (s *DefaultServer) Invoke(input map[string]interface{}) (interface{}, error) {
 	p, err := json.Marshal(input)
 
+	obj, ok := input["context"]
+	if !ok {
+		return nil, BadRequestError("No context in request body")
+	}
+
+	ctx, ok := obj.(map[string]interface{})
+	if !ok {
+		return nil, BadRequestError("Invalid context value in request body")
+	}
+
 	timeout := time.Duration(0)
-	if input.Context.Deadline != nil {
-		timeout = time.Until(*input.Context.Deadline)
+	if deadline, ok := ctx["deadline"]; ok {
+		if dl, ok := deadline.(string); ok {
+			t, err := time.Parse(time.RFC3339, dl)
+			if err != nil {
+				return nil, BadRequestError(fmt.Sprintf("Unable to parse deadline: %s", err))
+			}
+			timeout = time.Until(t)
+		}
 	}
 
 	if timeout < 0 {
