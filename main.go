@@ -28,7 +28,7 @@ type funkyHandler struct {
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var body funky.Message
+	var body funky.Request
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		resp := funky.Message{

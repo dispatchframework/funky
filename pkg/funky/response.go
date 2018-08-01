@@ -9,6 +9,12 @@ const (
 	SystemError   = "SystemError"
 )
 
+// Request a struct to hold the request body sent to a Dispatch function
+type Request struct {
+	Context map[string]interface{} `json:"context"`
+	Payload interface{}            `json:"payload"`
+}
+
 // Message a struct to hold the response to a Dispatch function invocation
 type Message struct {
 	Context *Context    `json:"context"`
