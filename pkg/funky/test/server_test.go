@@ -57,8 +57,8 @@ func TestInvokeSuccess(t *testing.T) {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
 
-	req := funky.Message{
-		Context: &funky.Context{},
+	req := funky.Request{
+		Context: map[string]interface{}{},
 	}
 
 	resp, err := server.Invoke(&req)
@@ -82,9 +82,8 @@ func TestInvokeBadRequest(t *testing.T) {
 		resp := map[string]string{
 			"myField": "Hello, Jon from Winterfell",
 		}
-		respBytes, _ := json.Marshal(resp)
 		w.WriteHeader(400)
-		fmt.Fprint(w, string(respBytes))
+		json.NewEncoder(w).Encode(resp)
 	}))
 	defer ts.Close()
 
@@ -99,8 +98,8 @@ func TestInvokeBadRequest(t *testing.T) {
 		t.Fatalf("Failed to create new server: %+v", err)
 	}
 
-	req := funky.Message{
-		Context: &funky.Context{},
+	req := funky.Request{
+		Context: map[string]interface{}{},
 	}
 
 	_, err = server.Invoke(&req)
@@ -111,5 +110,64 @@ func TestInvokeBadRequest(t *testing.T) {
 
 	if _, ok := err.(funky.FunctionServerError); !ok {
 		t.Errorf("Expected FunctionServerError got %s", err)
+	}
+}
+
+func TestInvokeContextPassthrough(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req funky.Request
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			t.Errorf("Failed parsing json payload: %s", err)
+		}
+
+		resp := map[string]interface{}{
+			"myField": "Hello, Jon from Winterfell",
+			"context": req.Context,
+		}
+
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	urlParts := strings.Split(ts.URL, ":")
+	port, err := strconv.Atoi(urlParts[len(urlParts)-1])
+	if err != nil {
+		t.Fatalf("Could not convert port %s", urlParts[len(urlParts)-1])
+	}
+
+	server, err := funky.NewServer(uint16(port), exec.Command("echo"))
+	if err != nil {
+		t.Fatalf("Failed to create new server: %+v", err)
+	}
+
+	context := map[string]interface{}{
+		"unknown": "field",
+	}
+
+	req := funky.Request{
+		Context: context,
+	}
+
+	resp, err := server.Invoke(&req)
+
+	if err != nil {
+		t.Fatalf("Failed to invoke function. Expected success")
+	}
+
+	if result, ok := resp.(map[string]interface{}); ok {
+		if obj, ok := result["context"]; ok {
+			if ctx, ok := obj.(map[string]interface{}); ok {
+				if unknown, ok := ctx["unknown"]; !ok || unknown != "field" {
+					t.Errorf("Did not properly pass along context value. Received: %s", unknown)
+				}
+			} else {
+				t.Errorf("Expected context to be a map[string]interface")
+			}
+		} else {
+			t.Errorf("Expected context key not found")
+		}
+	} else {
+		t.Errorf("Result from invoke was not a map[string]interface{} like expected")
 	}
 }

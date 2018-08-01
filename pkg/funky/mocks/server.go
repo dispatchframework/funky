@@ -24,11 +24,11 @@ func (_m *Server) GetPort() uint16 {
 }
 
 // Invoke provides a mock function with given fields: input
-func (_m *Server) Invoke(input *funky.Message) (interface{}, error) {
+func (_m *Server) Invoke(input *funky.Request) (interface{}, error) {
 	ret := _m.Called(input)
 
 	var r0 interface{}
-	if rf, ok := ret.Get(0).(func(*funky.Message) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(*funky.Request) interface{}); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
@@ -37,7 +37,7 @@ func (_m *Server) Invoke(input *funky.Message) (interface{}, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*funky.Message) error); ok {
+	if rf, ok := ret.Get(1).(func(*funky.Request) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

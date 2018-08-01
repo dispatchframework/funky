@@ -72,7 +72,7 @@ func TestDelegateSuccess(t *testing.T) {
 	server.On("Start").Return(nil)
 	server.On("IsIdle").Return(true)
 	server.On("SetIdle", mock.AnythingOfType("bool")).Return().Return()
-	server.On("Invoke", &funky.Message{}).Return(nil, nil)
+	server.On("Invoke", &funky.Request{}).Return(nil, nil)
 	server.On("Stdout").Return([]string{})
 	server.On("Stderr").Return([]string{})
 
@@ -81,7 +81,7 @@ func TestDelegateSuccess(t *testing.T) {
 
 	router, _ := funky.NewRouter(1, serverFactory)
 
-	_, err := router.Delegate(&funky.Message{})
+	_, err := router.Delegate(&funky.Request{})
 
 	if err != nil {
 		t.Error("Received unexpected error calling Delegate")
