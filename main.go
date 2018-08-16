@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"strconv"
 
 	"github.com/dispatchframework/funky/pkg/funky"
@@ -25,11 +26,17 @@ const (
 
 type funkyHandler struct {
 	router funky.Router
+	rw     funky.HttpReaderWriter
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var body funky.Request
-	err := json.NewDecoder(r.Body).Decode(&body)
+	if r.Header.Get("Content-Type") == "" {
+		r.Header.Set("Content-Type", "application/json")
+	}
+
+	var body *funky.Request
+	var result interface{}
+	result, err := f.rw.Read(reflect.TypeOf(funky.Request{}), r)
 	if err != nil {
 		resp := funky.Message{
 			Context: &funky.Context{
@@ -44,9 +51,14 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, _ := f.router.Delegate(&body)
+	body = result.(*funky.Request)
+	resp, _ := f.router.Delegate(body)
 
-	json.NewEncoder(w).Encode(resp)
+	accept := "application/json"
+	if r.Header.Get("Accept") != "" {
+		accept = r.Header.Get("Accept")
+	}
+	f.rw.Write(resp, accept, w)
 }
 
 func healthy(c <-chan struct{}) bool {
@@ -80,6 +92,11 @@ func main() {
 
 	handler := funkyHandler{
 		router: router,
+		rw: funky.NewDefaultHttpReaderWriter(
+			funky.NewJsonHttpMessageConverter(),
+			funky.NewYamlHttpMessageConverter(),
+			funky.NewBase64HttpMessageConverter(),
+			funky.NewPlainTextHttpMessageConverter()),
 	}
 
 	servMux := http.NewServeMux()
