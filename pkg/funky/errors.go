@@ -65,3 +65,10 @@ type UnknownSystemError string
 func (e UnknownSystemError) Error() string {
 	return fmt.Sprintf("Unknown system error: %s", string(e))
 }
+
+// UnsupportedMediaTypeError error for when HTTPReaderWriter does not support the given media type
+type UnsupportedMediaTypeError string
+
+func (e UnsupportedMediaTypeError) Error() string {
+	return fmt.Sprintf("Unsupported media type: %s", string(e))
+}

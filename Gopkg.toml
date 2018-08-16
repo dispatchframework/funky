@@ -29,6 +29,10 @@
   branch = "master"
   name = "golang.org/x/sync"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/ghodss/yaml"
+
 [prune]
   go-tests = true
   unused-packages = true

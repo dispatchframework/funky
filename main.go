@@ -25,11 +25,16 @@ const (
 
 type funkyHandler struct {
 	router funky.Router
+	rw     funky.HTTPReaderWriter
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") == "" {
+		r.Header.Set("Content-Type", "application/json")
+	}
+
 	var body funky.Request
-	err := json.NewDecoder(r.Body).Decode(&body)
+	err := f.rw.Read(&body, r)
 	if err != nil {
 		resp := funky.Message{
 			Context: &funky.Context{
@@ -46,7 +51,11 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, _ := f.router.Delegate(&body)
 
-	json.NewEncoder(w).Encode(resp)
+	accept := "application/json"
+	if r.Header.Get("Accept") != "" {
+		accept = r.Header.Get("Accept")
+	}
+	f.rw.Write(resp, accept, w)
 }
 
 func healthy(c <-chan struct{}) bool {
@@ -80,6 +89,11 @@ func main() {
 
 	handler := funkyHandler{
 		router: router,
+		rw: funky.NewDefaultHTTPReaderWriter(
+			funky.NewJSONHTTPMessageConverter(),
+			funky.NewYAMLHTTPMessageConverter(),
+			funky.NewBase64HTTPMessageConverter(),
+			funky.NewPlainTextHTTPMessageConverter()),
 	}
 
 	servMux := http.NewServeMux()
