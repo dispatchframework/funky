@@ -4,132 +4,143 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"reflect"
 
 	"github.com/ghodss/yaml"
 )
 
-type HttpReaderWriter interface {
-	Read(t reflect.Type, req *http.Request) (interface{}, error)
+// HTTPReaderWriter Describes an interface that can read arbitary objects from an http request and write arbitary objects to an http response
+type HTTPReaderWriter interface {
+	Read(result interface{}, req *http.Request) error
 	Write(body interface{}, contentType string, w http.ResponseWriter) error
 }
 
-type DefaultHttpReaderWriter struct {
-	converters []HttpMessageConverter
+// DefaultHTTPReaderWriter Default implementation for HttpReaderWriter
+type DefaultHTTPReaderWriter struct {
+	converters []HTTPMessageConverter
 }
 
-func NewDefaultHttpReaderWriter(converters ...HttpMessageConverter) *DefaultHttpReaderWriter {
-	return &DefaultHttpReaderWriter{
+// NewDefaultHTTPReaderWriter constructs a new DefaultHttpReaderWriter with the given HttpMessageConverters
+func NewDefaultHTTPReaderWriter(converters ...HTTPMessageConverter) *DefaultHTTPReaderWriter {
+	return &DefaultHTTPReaderWriter{
 		converters: converters,
 	}
 }
 
-func (rw *DefaultHttpReaderWriter) Read(t reflect.Type, req *http.Request) (interface{}, error) {
+// Read Tries to read the request into the object passed as result. result should be a pointer to the data. If no configured HttpMessageConverter can read the request this will return an UnsupportedMediaTypeError
+func (rw *DefaultHTTPReaderWriter) Read(result interface{}, req *http.Request) error {
+	contentType := req.Header.Get("Content-Type")
 	for _, v := range rw.converters {
-		if v.CanRead(t, req.Header.Get("Content-Type")) {
-			return v.Read(t, req)
+		if v.CanRead(reflect.TypeOf(result), contentType) {
+			return v.Read(result, req)
 		}
 	}
 
-	return nil, errors.New("No converter supports the type and request")
+	return UnsupportedMediaTypeError(contentType)
 }
 
-func (rw *DefaultHttpReaderWriter) Write(body interface{}, contentType string, w http.ResponseWriter) error {
+// Write Tries to write the body into the ResponseWrite. If no configured HttpMessageConverter can write the response this will return an UnsupportedMediaTypeError
+func (rw *DefaultHTTPReaderWriter) Write(body interface{}, contentType string, w http.ResponseWriter) error {
 	for _, v := range rw.converters {
 		if v.CanWrite(reflect.TypeOf(body), contentType) {
 			return v.Write(body, contentType, w)
 		}
 	}
 
-	return errors.New("No converter supports the type and body")
+	return UnsupportedMediaTypeError(contentType)
 }
 
-type HttpMessageConverter interface {
+// HTTPMessageConverter a generic interface for converting an http request into a given type, or writing a given type into an http response
+type HTTPMessageConverter interface {
 	CanRead(t reflect.Type, mediaType string) bool
 	CanWrite(t reflect.Type, mediaType string) bool
-	Read(t reflect.Type, req *http.Request) (interface{}, error)
+	Read(result interface{}, req *http.Request) error
 	Write(body interface{}, contentType string, res http.ResponseWriter) error
 }
 
-type JsonHttpMessageConverter struct {
+// JSONHTTPMessageConverter an HTTPMessageConverter for reading and writing json encoded data
+type JSONHTTPMessageConverter struct {
 	supportedMediaTypes    []string
 	supportedMediaTypesMap map[string]bool
 }
 
-func NewJsonHttpMessageConverter() *JsonHttpMessageConverter {
+// NewJSONHTTPMessageConverter constructs a JSONHTTPMessageConverter, sets supported media type to "application/json"
+func NewJSONHTTPMessageConverter() *JSONHTTPMessageConverter {
 	supportedMediaTypes := []string{"application/json"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
 	}
-	return &JsonHttpMessageConverter{
+	return &JSONHTTPMessageConverter{
 		supportedMediaTypes:    supportedMediaTypes,
 		supportedMediaTypesMap: supportedMediaTypesMap,
 	}
 }
 
-func (j *JsonHttpMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+// CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
+func (j *JSONHTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
 	return j.supportedMediaTypesMap[mediaType]
 }
 
-func (j *JsonHttpMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
+// CanWrite returns true if this converter can convert the given type into the given media type, false otherwise
+func (j *JSONHTTPMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
 	return j.supportedMediaTypesMap[mediaType]
 }
 
-func (j *JsonHttpMessageConverter) Read(t reflect.Type, req *http.Request) (interface{}, error) {
-	e := reflect.New(t)
-	err := json.NewDecoder(req.Body).Decode(e.Interface())
+func (j *JSONHTTPMessageConverter) Read(result interface{}, req *http.Request) error {
+	err := json.NewDecoder(req.Body).Decode(result)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return e.Interface(), nil
+	return nil
 }
 
-func (j *JsonHttpMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
+func (j *JSONHTTPMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
 	res.Header().Set("Content-Type", contentType)
 	return json.NewEncoder(res).Encode(body)
 }
 
-type YamlHttpMessageConverter struct {
+// YAMLHTTPMessageConverter an HTTPMessageConverter for reading and writing yaml encoded data
+type YAMLHTTPMessageConverter struct {
 	supportedMediaTypes    []string
 	supportedMediaTypesMap map[string]bool
 }
 
-func NewYamlHttpMessageConverter() *YamlHttpMessageConverter {
+// NewYAMLHTTPMessageConverter constructs a YAMLHTTPMessageConverter, sets supported media type to "application/yaml"
+func NewYAMLHTTPMessageConverter() *YAMLHTTPMessageConverter {
 	supportedMediaTypes := []string{"application/yaml"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
 	}
-	return &YamlHttpMessageConverter{
+	return &YAMLHTTPMessageConverter{
 		supportedMediaTypes:    supportedMediaTypes,
 		supportedMediaTypesMap: supportedMediaTypesMap,
 	}
 }
 
-func (y *YamlHttpMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+// CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
+func (y *YAMLHTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
 	return y.supportedMediaTypesMap[mediaType]
 }
 
-func (y *YamlHttpMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
+// CanWrite returns true if this converter can convert the given type into the given media type, false otherwise
+func (y *YAMLHTTPMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
 	return y.supportedMediaTypesMap[mediaType]
 }
 
-func (y *YamlHttpMessageConverter) Read(t reflect.Type, req *http.Request) (interface{}, error) {
-	e := reflect.New(t)
-
+func (y *YAMLHTTPMessageConverter) Read(result interface{}, req *http.Request) error {
 	buffer := bytes.Buffer{}
 	if _, err := buffer.ReadFrom(req.Body); err != nil {
-		return nil, err
+		return err
 	}
 
-	return e.Interface(), yaml.Unmarshal(buffer.Bytes(), e.Interface())
+	return yaml.Unmarshal(buffer.Bytes(), result)
 }
 
-func (y *YamlHttpMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
+func (y *YAMLHTTPMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
 	res.Header().Set("Content-Type", contentType)
 	data, err := yaml.Marshal(body)
 	if err != nil {
@@ -140,101 +151,113 @@ func (y *YamlHttpMessageConverter) Write(body interface{}, contentType string, r
 	return err
 }
 
-type Base64HttpMessageConverter struct {
+// Base64HTTPMessageConverter an HTTPMessageConverter for reading and writing base64 encoded data
+type Base64HTTPMessageConverter struct {
 	supportedMediaTypes    []string
 	supportedMediaTypesMap map[string]bool
 }
 
-func NewBase64HttpMessageConverter() *Base64HttpMessageConverter {
+// NewBase64HTTPMessageConverter constructs a Base64HTTPMessageConverter, sets supported media type to "application/base64"
+func NewBase64HTTPMessageConverter() *Base64HTTPMessageConverter {
 	supportedMediaTypes := []string{"application/base64"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
 	}
-	return &Base64HttpMessageConverter{
+	return &Base64HTTPMessageConverter{
 		supportedMediaTypes:    supportedMediaTypes,
 		supportedMediaTypesMap: supportedMediaTypesMap,
 	}
 }
 
-func (b *Base64HttpMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
-	return b.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf([]byte{})
+// CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
+func (b *Base64HTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+	return b.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf(&[]byte{})
 }
 
-func (b *Base64HttpMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
-	return b.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf([]byte{})
+// CanWrite returns true if this converter can convert the given type into the given media type, false otherwise
+func (b *Base64HTTPMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
+	return b.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf(&[]byte{})
 }
 
-func (b *Base64HttpMessageConverter) Read(t reflect.Type, req *http.Request) (interface{}, error) {
-	if !b.CanRead(t, req.Header.Get("Content-Type")) {
-		return nil, errors.New("UnsupportedMediaType")
+func (b *Base64HTTPMessageConverter) Read(result interface{}, req *http.Request) error {
+	contentType := req.Header.Get("Content-Type")
+	if !b.CanRead(reflect.TypeOf(result), contentType) {
+		return UnsupportedMediaTypeError(contentType)
 	}
 
 	buffer := bytes.Buffer{}
 	reader := base64.NewDecoder(base64.StdEncoding, req.Body)
 	if _, err := buffer.ReadFrom(reader); err != nil {
-		return nil, err
+		return err
 	}
 
-	return buffer.Bytes(), nil
+	*result.(*[]byte) = buffer.Bytes()
+	return nil
 }
 
-func (b *Base64HttpMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
+func (b *Base64HTTPMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
 	if !b.CanWrite(reflect.TypeOf(body), contentType) {
-		return errors.New("UnsupportedMediaType")
+		return UnsupportedMediaTypeError(contentType)
 	}
 
 	writer := base64.NewEncoder(base64.StdEncoding, res)
 
-	_, err := bytes.NewBuffer(body.([]byte)).WriteTo(writer)
+	_, err := bytes.NewBuffer(*body.(*[]byte)).WriteTo(writer)
 
 	return err
 }
 
-type PlainTextHttpMessageConverter struct {
+// PlainTextHTTPMessageConverter an HTTPMessageConverter for reading and writing plain text data
+type PlainTextHTTPMessageConverter struct {
 	supportedMediaTypes    []string
 	supportedMediaTypesMap map[string]bool
 }
 
-func NewPlainTextHttpMessageConverter() *PlainTextHttpMessageConverter {
+// NewPlainTextHTTPMessageConverter constructs a PlainTextHTTPMessageConverter, sets supported media type to "text/plain"
+func NewPlainTextHTTPMessageConverter() *PlainTextHTTPMessageConverter {
 	supportedMediaTypes := []string{"text/plain"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
 	}
-	return &PlainTextHttpMessageConverter{
+	return &PlainTextHTTPMessageConverter{
 		supportedMediaTypes:    supportedMediaTypes,
 		supportedMediaTypesMap: supportedMediaTypesMap,
 	}
 }
 
-func (p *PlainTextHttpMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
-	return p.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf("")
+// CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
+func (p *PlainTextHTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+	return p.supportedMediaTypesMap[mediaType] && t == reflect.PtrTo(reflect.TypeOf(""))
 }
 
-func (p *PlainTextHttpMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
-	return p.supportedMediaTypesMap[mediaType] && t == reflect.TypeOf("")
+// CanWrite returns true if this converter can convert the given type into the given media type, false otherwise
+func (p *PlainTextHTTPMessageConverter) CanWrite(t reflect.Type, mediaType string) bool {
+	return p.supportedMediaTypesMap[mediaType] && t == reflect.PtrTo(reflect.TypeOf(""))
 }
 
-func (p *PlainTextHttpMessageConverter) Read(t reflect.Type, req *http.Request) (interface{}, error) {
-	if !p.CanRead(t, req.Header.Get("Content-Type")) {
-		return nil, errors.New("UnsupportedMediaType")
+func (p *PlainTextHTTPMessageConverter) Read(result interface{}, req *http.Request) error {
+	contentType := req.Header.Get("Content-Type")
+	if !p.CanRead(reflect.TypeOf(result), contentType) {
+		return UnsupportedMediaTypeError(contentType)
 	}
 
 	buffer := bytes.Buffer{}
 	if _, err := buffer.ReadFrom(req.Body); err != nil {
-		return nil, err
+		return err
 	}
 
-	return buffer.String(), nil
+	*result.(*string) = buffer.String()
+	return nil
 }
 
-func (p *PlainTextHttpMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
+func (p *PlainTextHTTPMessageConverter) Write(body interface{}, contentType string, res http.ResponseWriter) error {
 	if !p.CanWrite(reflect.TypeOf(body), contentType) {
-		return errors.New("UnsupportedMediaType")
+		return UnsupportedMediaTypeError(contentType)
 	}
 
-	buffer := bytes.NewBufferString(body.(string))
+	buffer := bytes.NewBufferString(*body.(*string))
 
 	_, err := buffer.WriteTo(res)
 	return err

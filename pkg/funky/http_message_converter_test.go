@@ -11,9 +11,79 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+func TestReadNoConverters(t *testing.T) {
+	rw := NewDefaultHTTPReaderWriter()
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	var out map[string]interface{}
+	err := rw.Read(&out, req)
+
+	if err == nil {
+		t.Fatal("Should have failed reading with no configured converters")
+	}
+
+	if err != UnsupportedMediaTypeError("application/json") {
+		t.Errorf("Expected UnsupportedMediaTypeError, got: %+v", err)
+	}
+}
+
+func TestWriteNoConverters(t *testing.T) {
+	rw := NewDefaultHTTPReaderWriter()
+
+	res := httptest.NewRecorder()
+
+	var out map[string]interface{}
+	err := rw.Write(&out, "application/json", res)
+
+	if err == nil {
+		t.Fatal("Should have failed writing with no configured converters")
+	}
+
+	if err != UnsupportedMediaTypeError("application/json") {
+		t.Errorf("Expected UnsupportedMediaTypeError, got: %+v", err)
+	}
+}
+
+func TestReadUnsupportedContentType(t *testing.T) {
+	rw := NewDefaultHTTPReaderWriter(NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter())
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Content-Type", "application/xml")
+
+	var out map[string]interface{}
+	err := rw.Read(&out, req)
+
+	if err == nil {
+		t.Fatal("Should have failed reading Content-Type: application/xml")
+	}
+
+	if err != UnsupportedMediaTypeError("application/xml") {
+		t.Errorf("Expected UnsupportedMediaTypeError got: %+v", err)
+	}
+}
+
+func TestWriteUnsupportedContentType(t *testing.T) {
+	rw := NewDefaultHTTPReaderWriter(NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter())
+
+	var out map[string]interface{}
+
+	res := httptest.NewRecorder()
+	err := rw.Write(&out, "application/xml", res)
+
+	if err == nil {
+		t.Fatal("Should have failed writing Content-Type: application/xml")
+	}
+
+	if err != UnsupportedMediaTypeError("application/xml") {
+		t.Errorf("Expected UnsupportedMediaTypeError got: %+v", err)
+	}
+}
+
 func TestJsonReader(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	user := map[string]interface{}{
@@ -29,20 +99,21 @@ func TestJsonReader(t *testing.T) {
 	json.NewEncoder(&buffer).Encode(user)
 	req := httptest.NewRequest("GET", "/", &buffer)
 	req.Header.Set("Content-Type", "application/json")
-	out, err := rw.Read(reflect.TypeOf(map[string]interface{}{}), req)
+	var out map[string]interface{}
+	err := rw.Read(&out, req)
 
 	if err != nil {
 		t.Errorf("Error extracting request: %s", err)
 	}
 
-	if !reflect.DeepEqual(user, (*out.(*map[string]interface{}))) {
+	if !reflect.DeepEqual(user, out) {
 		t.Errorf("The extracted value is: %+v", out)
 	}
 }
 
 func TestJsonWriter(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	user := map[string]interface{}{
@@ -68,8 +139,8 @@ func TestJsonWriter(t *testing.T) {
 }
 
 func TestYamlReader(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	user := map[string]interface{}{
@@ -89,20 +160,21 @@ func TestYamlReader(t *testing.T) {
 	buffer := bytes.NewBuffer(data)
 	req := httptest.NewRequest("GET", "/", buffer)
 	req.Header.Set("Content-Type", "application/yaml")
-	out, err := rw.Read(reflect.TypeOf(map[string]interface{}{}), req)
+	var out map[string]interface{}
+	err = rw.Read(&out, req)
 
 	if err != nil {
 		t.Errorf("Error extracting request: %s", err)
 	}
 
-	if !reflect.DeepEqual(user, (*out.(*map[string]interface{}))) {
+	if !reflect.DeepEqual(user, out) {
 		t.Errorf("The extracted value is: %+v", out)
 	}
 }
 
 func TestYamlWriter(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	user := map[string]interface{}{
@@ -132,8 +204,8 @@ func TestYamlWriter(t *testing.T) {
 }
 
 func TestPlainTextReader(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	in := "This is my plain text string body"
@@ -141,27 +213,28 @@ func TestPlainTextReader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", buffer)
 	req.Header.Set("Content-Type", "text/plain")
 
-	out, err := rw.Read(reflect.TypeOf(""), req)
+	var out string
+	err := rw.Read(&out, req)
 
 	if err != nil {
 		t.Errorf("Error extracting request: %s", err)
 	}
 
-	if !reflect.DeepEqual(in, out.(string)) {
+	if !reflect.DeepEqual(in, out) {
 		t.Errorf("The extracted value is: %+v", out)
 	}
 }
 
 func TestPlainTextWriter(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	body := "This is the plain text to write"
 
 	w := httptest.NewRecorder()
 
-	if err := rw.Write(body, "text/plain", w); err != nil {
+	if err := rw.Write(&body, "text/plain", w); err != nil {
 		t.Errorf("Failed encoding body: %s", err)
 	}
 
@@ -172,8 +245,8 @@ func TestPlainTextWriter(t *testing.T) {
 }
 
 func TestBase64Reader(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	in := []byte{1, 2, 3, 4, 5, 6, 1, 1}
@@ -186,27 +259,28 @@ func TestBase64Reader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", outputBuffer)
 	req.Header.Set("Content-Type", "application/base64")
 
-	out, err := rw.Read(reflect.TypeOf([]byte{}), req)
+	var out []byte
+	err := rw.Read(&out, req)
 
 	if err != nil {
 		t.Errorf("Error extracting request: %s", err)
 	}
 
-	if !reflect.DeepEqual(in, out.([]byte)) {
+	if !reflect.DeepEqual(in, out) {
 		t.Errorf("The extracted value is: %+v", out)
 	}
 }
 
 func TestBase64Writer(t *testing.T) {
-	rw := DefaultHttpReaderWriter{
-		converters: []HttpMessageConverter{NewJsonHttpMessageConverter(), NewYamlHttpMessageConverter(), NewBase64HttpMessageConverter(), NewPlainTextHttpMessageConverter()},
+	rw := DefaultHTTPReaderWriter{
+		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
 	}
 
 	body := []byte{0, 1, 2, 3, 4, 5, 6, 7}
 
 	w := httptest.NewRecorder()
 
-	if err := rw.Write(body, "application/base64", w); err != nil {
+	if err := rw.Write(&body, "application/base64", w); err != nil {
 		t.Errorf("Failed encoding body: %s", err)
 	}
 
