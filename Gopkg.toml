@@ -33,6 +33,18 @@
   branch = "master"
   name = "github.com/ghodss/yaml"
 
+[[constraint]]
+  name = "k8s.io/client-go"
+  version = "kubernetes-1.10.0"
+
+[[constraint]]
+  name = "k8s.io/apimachinery"
+  version = "kubernetes-1.10.0"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "v1.2.2"
+
 [prune]
   go-tests = true
   unused-packages = true

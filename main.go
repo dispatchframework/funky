@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 
 	"github.com/dispatchframework/funky/pkg/funky"
 )
@@ -21,11 +22,14 @@ const (
 	serversEnvVar   = "SERVERS"
 	serverCmdEnvVar = "SERVER_CMD"
 	portEnvVar      = "PORT"
+	timeoutEnvVar   = "TIMEOUT"
+	secretsEnvVar   = "SECRETS"
+	namespaceEnvVar = "NAMESPACE"
 )
 
 type funkyHandler struct {
-	router funky.Router
-	rw     funky.HTTPReaderWriter
+	router      funky.Router
+	transformer funky.RequestTransformer
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -33,8 +37,8 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Content-Type", "application/json")
 	}
 
-	var body funky.Request
-	err := f.rw.Read(&body, r)
+	var body *funky.Request
+	body, err := f.transformer.Transform(r)
 	if err != nil {
 		resp := funky.Message{
 			Context: &funky.Context{
@@ -49,7 +53,7 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, _ := f.router.Delegate(&body)
+	resp, _ := f.router.Delegate(body)
 
 	accept := "application/json"
 	if r.Header.Get("Accept") != "" {
@@ -82,18 +86,38 @@ func main() {
 		log.Fatal("Too few arguments to server command.")
 	}
 
+	funcTimeout, err := strconv.Atoi(os.Getenv(timeoutEnvVar))
+	if err != nil {
+		log.Fatalf("Unable to parse %s environment variable to int", timeoutEnvVar)
+	}
+	if funcTimeout < 0 {
+		funcTimeout = 0
+	}
+
+	secrets := strings.Split(os.Getenv(secretsEnvVar), ",")
+	if len(secrets) == 0 {
+
+	}
+
+	namespace := os.Getenv(namespaceEnvVar)
+
+	factory, err := funky.NewDefaultSecretInterfaceFactory(nil)
+	secretClient := factory.CreateSecretInterface(namespace)
+	rw := funky.NewDefaultHTTPReaderWriter(
+		funky.NewJSONHTTPMessageConverter(),
+		funky.NewYAMLHTTPMessageConverter(),
+		funky.NewBase64HTTPMessageConverter(),
+		funky.NewPlainTextHTTPMessageConverter())
+	reqTransformer := funky.NewDefaultRequestTransformer(funcTimeout, secrets, secretClient, rw)
+
 	router, err := funky.NewRouter(numServers, serverFactory)
 	if err != nil {
 		log.Fatalf("Failed creating new router: %+v", err)
 	}
 
 	handler := funkyHandler{
-		router: router,
-		rw: funky.NewDefaultHTTPReaderWriter(
-			funky.NewJSONHTTPMessageConverter(),
-			funky.NewYAMLHTTPMessageConverter(),
-			funky.NewBase64HTTPMessageConverter(),
-			funky.NewPlainTextHTTPMessageConverter()),
+		router:      router,
+		transformer: reqTransformer,
 	}
 
 	servMux := http.NewServeMux()
