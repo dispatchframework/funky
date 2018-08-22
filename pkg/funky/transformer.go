@@ -1,36 +1,34 @@
 package funky
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
+	"os"
 )
 
+// RequestTransformer general interface for transforming http requests into Dispatch requests
 type RequestTransformer interface {
 	Transform(req *http.Request) (*Request, error)
 }
 
+// DefaultRequestTransformer transforms a request into a format suitable for Dispatch language servers
 type DefaultRequestTransformer struct {
-	timeout      int
-	secrets      []string
-	secretClient v1.SecretInterface
-	rw           HTTPReaderWriter
+	timeout int
+	secrets []string
+	rw      HTTPReaderWriter
 }
 
-// NewDefaultRequestTransformer transforms a request into a format suitable for Dispatch language servers
-func NewDefaultRequestTransformer(timeout int, secrets []string, client v1.SecretInterface, rw HTTPReaderWriter) RequestTransformer {
+// NewDefaultRequestTransformer constructs a new DefaultRequestTransformer
+func NewDefaultRequestTransformer(timeout int, secrets []string, rw HTTPReaderWriter) RequestTransformer {
 	return &DefaultRequestTransformer{
-		timeout:      timeout,
-		secrets:      secrets,
-		secretClient: client,
-		rw:           rw,
+		timeout: timeout,
+		secrets: secrets,
+		rw:      rw,
 	}
 }
 
+// Transform transforms an http request into a Dispatch request.
 func (r *DefaultRequestTransformer) Transform(req *http.Request) (*Request, error) {
 	var body Request
 
@@ -41,21 +39,20 @@ func (r *DefaultRequestTransformer) Transform(req *http.Request) (*Request, erro
 
 	// populate secrets
 	if len(r.secrets) != 0 {
-		secretList, err := r.secretClient.List(metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
 
 		secrets := map[string]string{}
 		for _, secretName := range r.secrets {
-			for _, secretItem := range secretList.Items {
-				if secretItem.GetName() != secretName {
-					continue
-				}
+			path := fmt.Sprintf("/run/secrets/%s", secretName)
 
-				for key, value := range secretItem.Data {
-					secrets[key] = string(value)
-				}
+			f, err := os.Open(path)
+			if os.IsNotExist(err) {
+				return nil, UnknownSystemError("file does not exist")
+			}
+			var data map[string]string
+			json.NewDecoder(f).Decode(&data)
+
+			for key, value := range data {
+				secrets[key] = string(value)
 			}
 		}
 
@@ -102,50 +99,4 @@ func (r *DefaultRequestTransformer) Transform(req *http.Request) (*Request, erro
 	}
 
 	return &body, nil
-}
-
-type ResponseTransformer interface {
-	Transform(res Message, w http.ResponseWriter)
-}
-
-type DefaultResponseTransformer struct {
-	rw HTTPReaderWriter
-}
-
-func NewDefaultResponseTransfomer(rw HTTPReaderWriter) ResponseTransformer {
-	return &DefaultResponseTransformer{
-		rw: rw,
-	}
-}
-
-func (r *DefaultResponseTransformer) Transform(res Message, w http.ResponseWriter) {
-
-}
-
-type SecretInterfaceFactory interface {
-	CreateSecretInterface(namespace string) v1.SecretInterface
-}
-
-type DefaultSecretInterfaceFactory struct {
-	k8sClient *kubernetes.Clientset
-}
-
-func NewDefaultSecretInterfaceFactory(config *rest.Config) (SecretInterfaceFactory, error) {
-	if config == nil {
-		if c, err := rest.InClusterConfig(); err != nil {
-			config = c
-		} else {
-			return nil, err
-		}
-	}
-
-	clientset := kubernetes.NewForConfigOrDie(config)
-
-	return &DefaultSecretInterfaceFactory{
-		k8sClient: clientset,
-	}, nil
-}
-
-func (f DefaultSecretInterfaceFactory) CreateSecretInterface(namespace string) v1.SecretInterface {
-	return f.k8sClient.CoreV1().Secrets(namespace)
 }

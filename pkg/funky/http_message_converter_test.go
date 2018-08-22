@@ -1,4 +1,4 @@
-package funky
+package funky_test
 
 import (
 	"bytes"
@@ -8,11 +8,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dispatchframework/funky/pkg/funky"
 	"github.com/ghodss/yaml"
 )
 
 func TestReadNoConverters(t *testing.T) {
-	rw := NewDefaultHTTPReaderWriter()
+	rw := funky.NewDefaultHTTPReaderWriter()
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -24,13 +25,13 @@ func TestReadNoConverters(t *testing.T) {
 		t.Fatal("Should have failed reading with no configured converters")
 	}
 
-	if err != UnsupportedMediaTypeError("application/json") {
+	if err != funky.UnsupportedMediaTypeError("application/json") {
 		t.Errorf("Expected UnsupportedMediaTypeError, got: %+v", err)
 	}
 }
 
 func TestWriteNoConverters(t *testing.T) {
-	rw := NewDefaultHTTPReaderWriter()
+	rw := funky.NewDefaultHTTPReaderWriter()
 
 	res := httptest.NewRecorder()
 
@@ -41,13 +42,13 @@ func TestWriteNoConverters(t *testing.T) {
 		t.Fatal("Should have failed writing with no configured converters")
 	}
 
-	if err != UnsupportedMediaTypeError("application/json") {
+	if err != funky.UnsupportedMediaTypeError("application/json") {
 		t.Errorf("Expected UnsupportedMediaTypeError, got: %+v", err)
 	}
 }
 
 func TestReadUnsupportedContentType(t *testing.T) {
-	rw := NewDefaultHTTPReaderWriter(NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter())
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Content-Type", "application/xml")
@@ -59,13 +60,13 @@ func TestReadUnsupportedContentType(t *testing.T) {
 		t.Fatal("Should have failed reading Content-Type: application/xml")
 	}
 
-	if err != UnsupportedMediaTypeError("application/xml") {
+	if err != funky.UnsupportedMediaTypeError("application/xml") {
 		t.Errorf("Expected UnsupportedMediaTypeError got: %+v", err)
 	}
 }
 
 func TestWriteUnsupportedContentType(t *testing.T) {
-	rw := NewDefaultHTTPReaderWriter(NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter())
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	var out map[string]interface{}
 
@@ -76,15 +77,13 @@ func TestWriteUnsupportedContentType(t *testing.T) {
 		t.Fatal("Should have failed writing Content-Type: application/xml")
 	}
 
-	if err != UnsupportedMediaTypeError("application/xml") {
+	if err != funky.UnsupportedMediaTypeError("application/xml") {
 		t.Errorf("Expected UnsupportedMediaTypeError got: %+v", err)
 	}
 }
 
 func TestJsonReader(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	user := map[string]interface{}{
 		"firstName": "Jon",
@@ -112,9 +111,7 @@ func TestJsonReader(t *testing.T) {
 }
 
 func TestJsonWriter(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	user := map[string]interface{}{
 		"firstName": "Jon",
@@ -139,9 +136,7 @@ func TestJsonWriter(t *testing.T) {
 }
 
 func TestYamlReader(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	user := map[string]interface{}{
 		"firstName": "Jon",
@@ -173,9 +168,7 @@ func TestYamlReader(t *testing.T) {
 }
 
 func TestYamlWriter(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	user := map[string]interface{}{
 		"firstName": "Jon",
@@ -204,9 +197,7 @@ func TestYamlWriter(t *testing.T) {
 }
 
 func TestPlainTextReader(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	in := "This is my plain text string body"
 	buffer := bytes.NewBufferString(in)
@@ -226,9 +217,7 @@ func TestPlainTextReader(t *testing.T) {
 }
 
 func TestPlainTextWriter(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	body := "This is the plain text to write"
 
@@ -245,9 +234,7 @@ func TestPlainTextWriter(t *testing.T) {
 }
 
 func TestBase64Reader(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	in := []byte{1, 2, 3, 4, 5, 6, 1, 1}
 	inputBuffer := bytes.NewBuffer(in)
@@ -272,9 +259,7 @@ func TestBase64Reader(t *testing.T) {
 }
 
 func TestBase64Writer(t *testing.T) {
-	rw := DefaultHTTPReaderWriter{
-		converters: []HTTPMessageConverter{NewJSONHTTPMessageConverter(), NewYAMLHTTPMessageConverter(), NewBase64HTTPMessageConverter(), NewPlainTextHTTPMessageConverter()},
-	}
+	rw := funky.NewDefaultHTTPReaderWriter(funky.NewJSONHTTPMessageConverter(), funky.NewYAMLHTTPMessageConverter(), funky.NewBase64HTTPMessageConverter(), funky.NewPlainTextHTTPMessageConverter())
 
 	body := []byte{0, 1, 2, 3, 4, 5, 6, 7}
 

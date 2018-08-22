@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/dispatchframework/funky/pkg/funky"
 	"github.com/dispatchframework/funky/pkg/funky/mocks"
@@ -18,8 +15,6 @@ import (
 )
 
 func TestTransformSuccess(t *testing.T) {
-	client := mocks.SecretInterface{}
-
 	payload := map[string]interface{}{
 		"name":  "Jon",
 		"place": "Winterfell",
@@ -32,15 +27,13 @@ func TestTransformSuccess(t *testing.T) {
 			*arg = payload
 		})
 
-	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &rw)
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
 	req := httptest.NewRequest("GET", "/", &body)
 	req.Header.Set("Content-Type", "application/json")
 	actual, _ := transformer.Transform(req)
-
-	client.AssertNotCalled(t, "List")
 
 	expected := &funky.Request{
 		Context: map[string]interface{}{
@@ -60,32 +53,7 @@ func TestTransformSuccess(t *testing.T) {
 }
 
 func TestTransformWithSecrets(t *testing.T) {
-	secrets := []string{"postgres_pwd"}
-
-	secretList := v1.SecretList{
-		Items: []v1.Secret{
-			v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "postgres_pwd",
-				},
-				Data: map[string][]byte{
-					"username": []byte("white_rabbit"),
-					"password": []byte("im_l8_im_l8"),
-				},
-			},
-			v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "unknown",
-				},
-				Data: map[string][]byte{
-					"username": []byte("Dr. No"),
-					"password": []byte("Spectre"),
-				},
-			},
-		},
-	}
-	client := mocks.SecretInterface{}
-	client.On("List", metav1.ListOptions{}).Return(&secretList, nil)
+	secrets := []string{"open_sesame"}
 
 	payload := map[string]interface{}{
 		"name":  "Jon",
@@ -98,7 +66,7 @@ func TestTransformWithSecrets(t *testing.T) {
 			arg := args.Get(0).(*map[string]interface{})
 			*arg = payload
 		})
-	transformer := funky.NewDefaultRequestTransformer(0, secrets, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, secrets, &rw)
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
@@ -128,32 +96,7 @@ func TestTransformWithSecrets(t *testing.T) {
 }
 
 func TestTransformWithConflictingSecrets(t *testing.T) {
-	secrets := []string{"postgres_pwd", "evil_lair"}
-
-	secretList := v1.SecretList{
-		Items: []v1.Secret{
-			v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "postgres_pwd",
-				},
-				Data: map[string][]byte{
-					"username": []byte("white_rabbit"),
-					"password": []byte("im_l8_im_l8"),
-				},
-			},
-			v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "evil_lair",
-				},
-				Data: map[string][]byte{
-					"username": []byte("Dr. No"),
-					"password": []byte("Spectre"),
-				},
-			},
-		},
-	}
-	client := mocks.SecretInterface{}
-	client.On("List", metav1.ListOptions{}).Return(&secretList, nil)
+	secrets := []string{"open_sesame", "evil_lair"}
 
 	payload := map[string]interface{}{
 		"name":  "Jon",
@@ -166,7 +109,7 @@ func TestTransformWithConflictingSecrets(t *testing.T) {
 			arg := args.Get(0).(*map[string]interface{})
 			*arg = payload
 		})
-	transformer := funky.NewDefaultRequestTransformer(0, secrets, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, secrets, &rw)
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
@@ -196,12 +139,10 @@ func TestTransformWithConflictingSecrets(t *testing.T) {
 }
 
 func TestTransformListSecretError(t *testing.T) {
-	secrets := []string{"postgres_pwd"}
-	client := mocks.SecretInterface{}
-	client.On("List", metav1.ListOptions{}).Return(nil, errors.New("Failed retrieving secret"))
+	secrets := []string{"non_existant"}
 
 	rw := mocks.HTTPReaderWriter{}
-	transformer := funky.NewDefaultRequestTransformer(0, secrets, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, secrets, &rw)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -211,8 +152,6 @@ func TestTransformListSecretError(t *testing.T) {
 }
 
 func TestTransformMissingContentType(t *testing.T) {
-	client := mocks.SecretInterface{}
-
 	payload := map[string]interface{}{
 		"name":  "Jon",
 		"place": "Winterfell",
@@ -225,14 +164,12 @@ func TestTransformMissingContentType(t *testing.T) {
 			*arg = payload
 		})
 
-	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &rw)
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
 	req := httptest.NewRequest("GET", "/", &body)
 	actual, _ := transformer.Transform(req)
-
-	client.AssertNotCalled(t, "List")
 
 	expected := &funky.Request{
 		Context: map[string]interface{}{
@@ -252,8 +189,6 @@ func TestTransformMissingContentType(t *testing.T) {
 }
 
 func TestTransformUnsupportedContentType(t *testing.T) {
-	client := mocks.SecretInterface{}
-
 	payload := map[string]interface{}{
 		"name":  "Jon",
 		"place": "Winterfell",
@@ -262,15 +197,13 @@ func TestTransformUnsupportedContentType(t *testing.T) {
 	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(funky.UnsupportedMediaTypeError("application/xml"))
 
-	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &client, &rw)
+	transformer := funky.NewDefaultRequestTransformer(0, []string{}, &rw)
 
 	var body bytes.Buffer
 	xml.NewEncoder(&body).Encode(payload)
 	req := httptest.NewRequest("GET", "/", &body)
 	req.Header.Set("Content-Type", "application/xml")
 	_, err := transformer.Transform(req)
-
-	client.AssertNotCalled(t, "List")
 
 	assert.Error(t, err, "Expected Transform to fail with UnsupportedMediaTypeError, instead got %+v", err)
 }

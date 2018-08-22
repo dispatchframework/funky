@@ -24,19 +24,15 @@ const (
 	portEnvVar      = "PORT"
 	timeoutEnvVar   = "TIMEOUT"
 	secretsEnvVar   = "SECRETS"
-	namespaceEnvVar = "NAMESPACE"
 )
 
 type funkyHandler struct {
 	router      funky.Router
 	transformer funky.RequestTransformer
+	rw          funky.HTTPReaderWriter
 }
 
 func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") == "" {
-		r.Header.Set("Content-Type", "application/json")
-	}
-
 	var body *funky.Request
 	body, err := f.transformer.Transform(r)
 	if err != nil {
@@ -99,16 +95,12 @@ func main() {
 
 	}
 
-	namespace := os.Getenv(namespaceEnvVar)
-
-	factory, err := funky.NewDefaultSecretInterfaceFactory(nil)
-	secretClient := factory.CreateSecretInterface(namespace)
 	rw := funky.NewDefaultHTTPReaderWriter(
 		funky.NewJSONHTTPMessageConverter(),
 		funky.NewYAMLHTTPMessageConverter(),
 		funky.NewBase64HTTPMessageConverter(),
 		funky.NewPlainTextHTTPMessageConverter())
-	reqTransformer := funky.NewDefaultRequestTransformer(funcTimeout, secrets, secretClient, rw)
+	reqTransformer := funky.NewDefaultRequestTransformer(funcTimeout, secrets, rw)
 
 	router, err := funky.NewRouter(numServers, serverFactory)
 	if err != nil {
@@ -118,6 +110,7 @@ func main() {
 	handler := funkyHandler{
 		router:      router,
 		transformer: reqTransformer,
+		rw:          rw,
 	}
 
 	servMux := http.NewServeMux()
