@@ -100,7 +100,10 @@ func main() {
 		funky.NewYAMLHTTPMessageConverter(),
 		funky.NewBase64HTTPMessageConverter(),
 		funky.NewPlainTextHTTPMessageConverter())
-	reqTransformer := funky.NewDefaultRequestTransformer(funcTimeout, secrets, rw)
+
+	injectors := []funky.ContextInjector{funky.NewTimeoutInjector(funcTimeout),
+		funky.NewEnvVarSecretInjector(secrets...), funky.NewRequestMetadataInjector()}
+	reqTransformer := funky.NewDefaultRequestTransformer(rw, injectors)
 
 	router, err := funky.NewRouter(numServers, serverFactory)
 	if err != nil {

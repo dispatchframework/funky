@@ -16,6 +16,13 @@ func (e IllegalArgumentError) Error() string {
 	return fmt.Sprintf("The argument is illegal or inappropriate: %s", string(e))
 }
 
+// IllegalStateError An error indicating that the application or method is in an illegal state.
+type IllegalStateError string
+
+func (e IllegalStateError) Error() string {
+	return string(e)
+}
+
 // TimeoutError An error indicating that a timeout has been exceeded
 type TimeoutError string
 
