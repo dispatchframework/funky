@@ -8,6 +8,12 @@
   version = "v1.1.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/ghodss/yaml"
+  packages = ["."]
+  revision = "e9ed3c6dfb39bb1a32197cb10d527906fe4da4b6"
+
+[[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
@@ -40,9 +46,15 @@
   packages = ["semaphore"]
   revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
 
+[[projects]]
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6f943fffc7a901c8eea4a5d95974bd13b57d928698949a1f6082069fe0dc610a"
+  inputs-digest = "72302bee81ac56e67257384fb96a6d387329377b1d4eb6686176581d6ad7b17c"
   solver-name = "gps-cdcl"
   solver-version = 1

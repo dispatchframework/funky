@@ -2,6 +2,7 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
+
 package funky
 
 import (
@@ -96,18 +97,10 @@ func (s *DefaultServer) Invoke(input *Request) (interface{}, error) {
 	p, err := json.Marshal(input)
 
 	timeout := time.Duration(0)
-	if deadline, ok := input.Context["deadline"]; ok {
-		if dl, ok := deadline.(string); ok {
-			t, err := time.Parse(time.RFC3339, dl)
-			if err != nil {
-				return nil, BadRequestError(fmt.Sprintf("Unable to parse deadline: %s", err))
-			}
-			timeout = time.Until(t)
+	if t, ok := input.Context["timeout"]; ok {
+		if ti, ok := t.(int); ok {
+			timeout = time.Duration(ti) * time.Millisecond
 		}
-	}
-
-	if timeout < 0 {
-		return nil, TimeoutError("Did not invoke, already exceeded timeout")
 	}
 
 	s.client.Timeout = timeout

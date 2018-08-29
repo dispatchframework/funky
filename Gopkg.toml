@@ -29,6 +29,14 @@
   branch = "master"
   name = "golang.org/x/sync"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/ghodss/yaml"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "v1.2.2"
+
 [prune]
   go-tests = true
   unused-packages = true

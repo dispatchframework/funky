@@ -2,6 +2,7 @@
 // Copyright (c) 2018 VMware, Inc. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 ///////////////////////////////////////////////////////////////////////
+
 package funky
 
 import (
@@ -13,6 +14,13 @@ type IllegalArgumentError string
 
 func (e IllegalArgumentError) Error() string {
 	return fmt.Sprintf("The argument is illegal or inappropriate: %s", string(e))
+}
+
+// IllegalStateError An error indicating that the application or method is in an illegal state.
+type IllegalStateError string
+
+func (e IllegalStateError) Error() string {
+	return string(e)
 }
 
 // TimeoutError An error indicating that a timeout has been exceeded
@@ -64,4 +72,11 @@ type UnknownSystemError string
 
 func (e UnknownSystemError) Error() string {
 	return fmt.Sprintf("Unknown system error: %s", string(e))
+}
+
+// UnsupportedMediaTypeError error for when HTTPReaderWriter does not support the given media type
+type UnsupportedMediaTypeError string
+
+func (e UnsupportedMediaTypeError) Error() string {
+	return fmt.Sprintf("Unsupported media type: %s", string(e))
 }
