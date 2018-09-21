@@ -8,7 +8,6 @@ package funky_test
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"net/http/httptest"
 	"testing"
 
@@ -19,16 +18,53 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestTransformSuccess(t *testing.T) {
+func TestTransformGETSuccess(t *testing.T) {
+	payload := map[string]interface{}{
+		"name":  "Jon",
+		"place": "Winterfell",
+		"year":  int64(2046),
+	}
+	rw := &mocks.HTTPReaderWriter{}
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).Return(nil)
+
+	injectors := []funky.ContextInjector{
+		funky.NewTimeoutInjector(),
+		funky.NewRequestMetadataInjector()}
+
+	transformer := funky.NewDefaultRequestTransformer(rw, injectors)
+
+	req := httptest.NewRequest("GET", "/?name=Jon&place=Winterfell&year=2046", nil)
+	req.Header.Set("Content-Type", "application/json")
+	actual, err := transformer.Transform(req)
+	assert.NoError(t, err)
+
+	expected := &funky.Request{
+		Context: map[string]interface{}{
+			"timeout": 0,
+			"request": map[string]interface{}{
+				"uri":    req.RequestURI,
+				"method": req.Method,
+				"header": req.Header,
+			},
+		},
+		Payload: payload,
+	}
+
+	if !assert.ObjectsAreEqualValues(expected, actual) {
+		t.Errorf("did not get expected result. expected:%+v, actual:%+v", expected, actual)
+	}
+}
+
+func TestTransformPOSTSuccess(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":  "Jon",
 		"place": "Winterfell",
 	}
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			arg := args.Get(0).(*map[string]interface{})
+			arg := args.Get(0).(*interface{})
 			*arg = payload
 		})
 
@@ -40,7 +76,7 @@ func TestTransformSuccess(t *testing.T) {
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
-	req := httptest.NewRequest("GET", "/", &body)
+	req := httptest.NewRequest("POST", "/", &body)
 	req.Header.Set("Content-Type", "application/json")
 	actual, _ := transformer.Transform(req)
 
@@ -67,10 +103,10 @@ func TestTransformMissingContentType(t *testing.T) {
 		"place": "Winterfell",
 	}
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			arg := args.Get(0).(*map[string]interface{})
+			arg := args.Get(0).(*interface{})
 			*arg = payload
 		})
 
@@ -79,7 +115,7 @@ func TestTransformMissingContentType(t *testing.T) {
 
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode(payload)
-	req := httptest.NewRequest("GET", "/", &body)
+	req := httptest.NewRequest("POST", "/", &body)
 	actual, _ := transformer.Transform(req)
 
 	expected := &funky.Request{
@@ -93,20 +129,16 @@ func TestTransformMissingContentType(t *testing.T) {
 }
 
 func TestTransformUnsupportedContentType(t *testing.T) {
-	payload := map[string]interface{}{
-		"name":  "Jon",
-		"place": "Winterfell",
-	}
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(funky.UnsupportedMediaTypeError("application/xml"))
 
 	injectors := []funky.ContextInjector{}
 	transformer := funky.NewDefaultRequestTransformer(rw, injectors)
 
 	var body bytes.Buffer
-	xml.NewEncoder(&body).Encode(payload)
-	req := httptest.NewRequest("GET", "/", &body)
+	body.WriteString("<payload><name>Jon</name></payload>")
+	req := httptest.NewRequest("POST", "/", &body)
 	req.Header.Set("Content-Type", "application/xml")
 	actual, err := transformer.Transform(req)
 
@@ -121,10 +153,10 @@ func TestTransformNoInjectors(t *testing.T) {
 	}
 
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			p := args.Get(0).(*map[string]interface{})
+			p := args.Get(0).(*interface{})
 			*p = payload
 		})
 
@@ -134,7 +166,7 @@ func TestTransformNoInjectors(t *testing.T) {
 	data := bytes.Buffer{}
 	json.NewEncoder(&data).Encode(payload)
 
-	req := httptest.NewRequest("GET", "/", &data)
+	req := httptest.NewRequest("POST", "/", &data)
 	req.Header.Set("Content-Type", "application/json")
 
 	actual, err := transformer.Transform(req)
@@ -156,10 +188,10 @@ func TestTransformNonAwareInjectorNoError(t *testing.T) {
 	}
 
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			p := args.Get(0).(*map[string]interface{})
+			p := args.Get(0).(*interface{})
 			*p = payload
 		})
 
@@ -175,7 +207,7 @@ func TestTransformNonAwareInjectorNoError(t *testing.T) {
 	data := bytes.Buffer{}
 	json.NewEncoder(&data).Encode(payload)
 
-	req := httptest.NewRequest("GET", "/", &data)
+	req := httptest.NewRequest("POST", "/", &data)
 	req.Header.Set("Content-Type", "application/json")
 
 	actual, err := transformer.Transform(req)
@@ -200,7 +232,7 @@ func TestTransformRequestAwareInjectorNoError(t *testing.T) {
 	data := bytes.Buffer{}
 	json.NewEncoder(&data).Encode(payload)
 
-	req := httptest.NewRequest("GET", "/", &data)
+	req := httptest.NewRequest("POST", "/", &data)
 	req.Header.Set("Content-Type", "application/json")
 
 	requestCtx := map[string]interface{}{
@@ -222,10 +254,10 @@ func TestTransformRequestAwareInjectorNoError(t *testing.T) {
 	injectors := []funky.ContextInjector{&requestMetadataInjector}
 
 	rw := &mocks.HTTPReaderWriter{}
-	rw.On("Read", mock.AnythingOfType("*map[string]interface {}"), mock.AnythingOfType("*http.Request")).
+	rw.On("Read", mock.AnythingOfType("*interface {}"), mock.AnythingOfType("*http.Request")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			p := args.Get(0).(*map[string]interface{})
+			p := args.Get(0).(*interface{})
 			*p = payload
 		})
 
