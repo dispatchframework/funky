@@ -11,9 +11,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/ghodss/yaml"
 )
+
+func getTypeFromFragment(mediaType string) string {
+	fragments := strings.Split(mediaType, "+")
+	if len(fragments) == 2 {
+		// Use the identifier as the content type
+		mediaType = fragments[1]
+	}
+	return mediaType
+}
 
 // HTTPReaderWriter Describes an interface that can read arbitary objects from an http request and write arbitary objects to an http response
 type HTTPReaderWriter interface {
@@ -72,7 +82,7 @@ type JSONHTTPMessageConverter struct {
 
 // NewJSONHTTPMessageConverter constructs a JSONHTTPMessageConverter, sets supported media type to "application/json"
 func NewJSONHTTPMessageConverter() *JSONHTTPMessageConverter {
-	supportedMediaTypes := []string{"application/json"}
+	supportedMediaTypes := []string{"*/*", "application/json", "json"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
@@ -85,6 +95,7 @@ func NewJSONHTTPMessageConverter() *JSONHTTPMessageConverter {
 
 // CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
 func (j *JSONHTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+	mediaType = getTypeFromFragment(mediaType)
 	return j.supportedMediaTypesMap[mediaType]
 }
 
@@ -115,7 +126,7 @@ type YAMLHTTPMessageConverter struct {
 
 // NewYAMLHTTPMessageConverter constructs a YAMLHTTPMessageConverter, sets supported media type to "application/yaml"
 func NewYAMLHTTPMessageConverter() *YAMLHTTPMessageConverter {
-	supportedMediaTypes := []string{"application/yaml"}
+	supportedMediaTypes := []string{"*/*", "application/yaml", "yaml"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
@@ -128,6 +139,7 @@ func NewYAMLHTTPMessageConverter() *YAMLHTTPMessageConverter {
 
 // CanRead returns true if this converter can convert input described in the given media type into the given type, false otherwise
 func (y *YAMLHTTPMessageConverter) CanRead(t reflect.Type, mediaType string) bool {
+	mediaType = getTypeFromFragment(mediaType)
 	return y.supportedMediaTypesMap[mediaType]
 }
 
@@ -164,7 +176,7 @@ type Base64HTTPMessageConverter struct {
 
 // NewBase64HTTPMessageConverter constructs a Base64HTTPMessageConverter, sets supported media type to "application/base64"
 func NewBase64HTTPMessageConverter() *Base64HTTPMessageConverter {
-	supportedMediaTypes := []string{"application/base64"}
+	supportedMediaTypes := []string{"*/*", "application/base64"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true
@@ -221,7 +233,7 @@ type PlainTextHTTPMessageConverter struct {
 
 // NewPlainTextHTTPMessageConverter constructs a PlainTextHTTPMessageConverter, sets supported media type to "text/plain"
 func NewPlainTextHTTPMessageConverter() *PlainTextHTTPMessageConverter {
-	supportedMediaTypes := []string{"text/plain"}
+	supportedMediaTypes := []string{"*/*", "text/plain"}
 	supportedMediaTypesMap := map[string]bool{}
 	for _, v := range supportedMediaTypes {
 		supportedMediaTypesMap[v] = true

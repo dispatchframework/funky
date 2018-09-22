@@ -6,6 +6,7 @@
 package funky
 
 import (
+	"encoding/json"
 	"net/http"
 )
 
@@ -44,31 +45,63 @@ func (r *DefaultRequestTransformer) Transform(req *http.Request) (*Request, erro
 	}
 
 	var err error
-	// populate payload
-	contentType := req.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/json"
-	}
+	// No support for chunked encoding presently
+	if req.ContentLength > 0 {
+		// populate payload
+		contentType := req.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
+			req.Header.Add("Content-Type", contentType)
+		}
 
-	switch contentType {
-	case "application/base64":
-		var payload []byte
-		err = r.rw.Read(&payload, req)
-		body.Payload = payload
-	case "text/plain":
-		var payload string
-		err = r.rw.Read(&payload, req)
-		body.Payload = payload
-	case "application/json", "application/yaml":
-		var payload map[string]interface{}
-		err = r.rw.Read(&payload, req)
-		body.Payload = payload
-	default:
-		err = UnsupportedMediaTypeError(contentType)
+		contentType = getTypeFromFragment(contentType)
+
+		switch contentType {
+		case "application/base64":
+			var payload []byte
+			err = r.rw.Read(&payload, req)
+			body.Payload = payload
+		case "text/plain":
+			var payload string
+			err = r.rw.Read(&payload, req)
+			body.Payload = payload
+		case "application/json", "application/yaml", "json", "yaml":
+			var payload interface{}
+			err = r.rw.Read(&payload, req)
+			body.Payload = payload
+		default:
+			err = UnsupportedMediaTypeError(contentType)
+		}
 	}
 
 	if err != nil {
 		return nil, err
+	}
+
+	// All non POST requests must be transformed as the function interface
+	// expects a POST.
+	switch req.Method {
+	case http.MethodGet, http.MethodOptions:
+		payload := make(map[string]interface{})
+		values := req.URL.Query()
+		for k, v := range values {
+			// Although HTTP allows for more than one value for a given key
+			// we are simply taking the last.  The functions will expect a map.
+			if len(v) > 0 {
+				val := v[len(v)-1]
+				num := json.Number(val)
+				if i, err := num.Int64(); err == nil {
+					payload[k] = i
+					continue
+				}
+				if f, err := num.Float64(); err == nil {
+					payload[k] = f
+					continue
+				}
+				payload[k] = val
+			}
+		}
+		body.Payload = payload
 	}
 
 	return &body, nil

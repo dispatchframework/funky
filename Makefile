@@ -1,6 +1,9 @@
 GIT_VERSION = $(shell git describe --tags --dirty)
 VERSION ?= $(GIT_VERSION)
 
+SHELL := /bin/bash
+GO ?= go
+
 VERSION_PACKAGE := github.com/dispatchframework/funky/pkg/version
 
 GO_LDFLAGS := -X $(VERSION_PACKAGE).version=$(VERSION)
