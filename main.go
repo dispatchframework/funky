@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -51,11 +52,16 @@ func (f funkyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, _ := f.router.Delegate(body)
 
-	accept := "application/json"
-	if r.Header.Get("Accept") != "" {
-		accept = r.Header.Get("Accept")
+	accept := r.Header.Get("Accept")
+	matched, err := regexp.Match("(application|\\*)\\/(json|\\*)|^$", []byte(accept))
+	if matched {
+		accept = "application/json"
 	}
-	f.rw.Write(resp, accept, w)
+
+	err = f.rw.Write(resp, accept, w)
+	if err != nil {
+		fmt.Fprintf(w, "Unsupported Accept type: %s", accept)
+	}
 }
 
 func healthy(c <-chan struct{}) bool {
@@ -68,9 +74,9 @@ func healthy(c <-chan struct{}) bool {
 }
 
 func main() {
-	numServers, err := strconv.Atoi(os.Getenv(serversEnvVar))
+	numServers, err := envVarGetInt(serversEnvVar, 1)
 	if err != nil {
-		log.Fatalf("Unable to parse %s environment variable", serversEnvVar)
+		log.Fatalf("Unable to parse %s environment variable to int", serversEnvVar)
 	}
 	if numServers < 1 {
 		numServers = 1
@@ -82,7 +88,7 @@ func main() {
 		log.Fatal("Too few arguments to server command.")
 	}
 
-	funcTimeout, err := strconv.Atoi(os.Getenv(timeoutEnvVar))
+	funcTimeout, err := envVarGetInt(timeoutEnvVar, 0)
 	if err != nil {
 		log.Fatalf("Unable to parse %s environment variable to int", timeoutEnvVar)
 	}
@@ -91,9 +97,6 @@ func main() {
 	}
 
 	secrets := strings.Split(os.Getenv(secretsEnvVar), ",")
-	if len(secrets) == 0 {
-
-	}
 
 	rw := funky.NewDefaultHTTPReaderWriter(
 		funky.NewJSONHTTPMessageConverter(),
@@ -146,4 +149,12 @@ func main() {
 	}()
 
 	server.ListenAndServe()
+}
+
+func envVarGetInt(envVar string, orElse int) (int, error) {
+	if os.Getenv(envVar) == "" {
+		return orElse, nil
+	}
+
+	return strconv.Atoi(os.Getenv(envVar))
 }
