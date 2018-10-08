@@ -35,6 +35,9 @@ func (i *EnvVarSecretInjector) Inject(req *Request) error {
 
 	secrets := map[string]string{}
 	for _, v := range i.secrets {
+		if v == "" {
+			continue
+		}
 		secrets[v] = os.Getenv("d_secret_" + v)
 	}
 
